@@ -1,0 +1,55 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: ko-KR
+tone_instructions: >
+  모든 리뷰, 요약, 제안은 한국어로 작성하세요.
+  queue 서버의 동시성, Redis key/TTL, 분산 락, JWT/admission token 검증, 운영 설정 불일치 가능성을 우선 확인하세요.
+
+reviews:
+  profile: assertive
+  high_level_summary: true
+  review_status: true
+  commit_status: true
+  changed_files_summary: true
+  collapse_walkthrough: false
+  path_filters:
+    - "**/*"
+    - "!build/**"
+    - "!.gradle/**"
+    - "!.idea/**"
+  path_instructions:
+    - path: "src/main/java/**"
+      instructions: |
+        - 항상 한국어로 리뷰하세요.
+        - 대기열 상태 전이, Redis key 전략, TTL/만료 처리, scheduler/listener 정합성, 분산 락 경계를 우선 확인하세요.
+        - JWT 검증, admission token 발급/검증, 운영 환경 변수 불일치 가능성을 함께 확인하세요.
+    - path: ".github/**"
+      instructions: |
+        - workflow 변경은 잘못된 배포 트리거, secret 노출, 권한 과다 부여, CI 실패 가능성을 중심으로 확인하세요.
+  auto_review:
+    enabled: true
+    drafts: true
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 0
+    ignore_title_keywords:
+      - "WIP"
+      - "[WIP]"
+      - "[skip ai]"
+      - "[skip review]"
+    base_branches:
+      - "master"
+      - "develop"
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  web_search:
+    enabled: true
+  learnings:
+    scope: auto
+  issues:
+    scope: local
+  pull_requests:
+    scope: local
