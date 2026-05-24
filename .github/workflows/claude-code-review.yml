@@ -1,0 +1,43 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    branches: [ "master", "develop" ]
+    types: [opened, synchronize, ready_for_review, reopened]
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
+          plugins: 'code-review@claude-code-plugins'
+          prompt: |
+            ticket-queue 저장소의 queue 서버 변경을 심층 리뷰하세요.
+            가능하면 README.md, build.gradle, src/main/resources/application.yml, queue 도메인/infra 주변 코드를 함께 확인하세요.
+
+            공식 code-review 플러그인을 실행합니다.
+            /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
+
+            ## 리뷰 작성 규칙
+            - 모든 출력은 한국어로 작성합니다.
+            - 패치만 보지 말고 대기열 상태 전이, Redis key/TTL, 분산 락, scheduler, JWT/admission token 흐름을 함께 확인합니다.
+            - 동시성, 만료 처리, 운영 환경 변수 불일치, 보안 검증 누락, 테스트 공백을 우선 확인합니다.
+            - 심각도 순서(CRITICAL → HIGH → MEDIUM → LOW)로 정리합니다.
+            - 확신이 없는 지적은 "불확실"로 표시합니다.
+            - 요청 범위를 벗어난 리팩터링이나 기능 추가는 제안하지 않습니다.
