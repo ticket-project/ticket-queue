@@ -1,5 +1,5 @@
 server:
-  port: ${QUEUE_SERVER_PORT:8090}
+  port: 8090
 
 spring:
   application:
@@ -14,22 +14,18 @@ spring:
 security:
   jwt:
     issuer: ${JWT_ISSUER:ticket}
-    secret-key: ${JWT_SECRET_KEY:local-development-access-token-secret-key-32bytes}
-    access-token-expiration-seconds: ${JWT_ACCESS_TOKEN_EXPIRATION_SECONDS:1800}
+    secret-key: ${JWT_SECRET}
   admission:
     issuer: ${ADMISSION_TOKEN_ISSUER:ticket-queue}
     audience: ${ADMISSION_TOKEN_AUDIENCE:ticket-api}
-    secret-key: ${ADMISSION_TOKEN_SECRET_KEY:local-development-admission-secret-key-32bytes}
-    expiration-seconds: ${ADMISSION_TOKEN_EXPIRATION_SECONDS:300}
+    secret-key: ${ADMISSION_TOKEN_SECRET_KEY:0123456789abcdef0123456789abcdef}
 
 app:
   queue:
-    default-level: ${QUEUE_DEFAULT_LEVEL:LEVEL_1}
-    default-max-active-users: ${QUEUE_DEFAULT_MAX_ACTIVE_USERS:300}
-    default-entry-token-ttl: ${QUEUE_ACTIVE_TTL:5m}
-    entry-retention: ${QUEUE_ENTRY_RETENTION:1h}
+    admit-limit-per-tick: ${QUEUE_ADMIT_LIMIT_PER_TICK:50}
+    active-ttl: ${QUEUE_ACTIVE_TTL:5m}
     advance-interval-ms: ${QUEUE_ADVANCE_INTERVAL_MS:1000}
     api:
-      session-ttl: ${QUEUE_SESSION_TTL:1h}
+      session-ttl: ${QUEUE_SESSION_TTL:2h}
     redirect:
       ticketing-url-template: ${QUEUE_TICKETING_URL_TEMPLATE:/booking/seat?performanceId={performanceId}}

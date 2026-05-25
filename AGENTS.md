@@ -25,22 +25,21 @@
 
 패키지 경계는 다음과 같이 유지한다.
 
-- `com.ticket.queue.controller`: Queue HTTP API
-- `com.ticket.queue.service`: application service, admission 응답 조립
-- `com.ticket.queue.scheduler`: waiting queue 주기적 승격
-- `com.ticket.queue.domain`: queue model, policy, use case, port
-- `com.ticket.queue.infra`: Redis/Redisson 저장소, distributed lock AOP
-- `com.ticket.queue.config`: security/properties 설정
-- `com.ticket.support.security`: JWT 검증과 admission token 공통 유틸
+- `com.ticket.queue.api`: enter/status HTTP API와 응답 DTO
+- `com.ticket.queue.application`: use case, status 조회, scheduler, admission 응답 조립
+- `com.ticket.queue.config`: app.queue와 admission token 설정
+- `com.ticket.queue.domain`: queue model과 port
+- `com.ticket.queue.infra`: Redis/Redisson 저장소, distributed lock AOP, signed admission token 발급 구현
 
 Queue Server는 Ticket Server의 좌석 선택, hold, 주문, refresh token Redis에 접근하지 않는다.
 
 ## 고위험 영역
 
-- waiting/active 전환은 TTL, 중복 진입, 순번 계산, active 정원과 함께 검증한다.
+- waiting/active 전환은 TTL, 중복 진입, 순번 계산, tick당 승격 수와 함께 검증한다.
 - queue session 만료는 queue entry 만료와 동일하지 않다.
 - admission token secret, issuer, audience는 Ticket Server 설정과 일치해야 한다.
-- 대기열 등록 이후 polling은 `X-Queue-Session` 기반이다. 매번 access token을 검증하지 않는다.
+- `activeTtl`은 active member TTL이자 Ticket Server 예매 API 사용 가능 TTL이다.
+- Queue Server의 enter/status는 access token을 검증하지 않는다. status polling은 `X-Queue-Session` 기반이다.
 - active 응답 이후 클라이언트는 Queue Server polling을 중지하고 Ticket Server 예매 흐름으로 이동한다.
 - Redis Cluster 운영을 고려해 key naming과 자료구조 변경은 신중하게 검토한다.
 

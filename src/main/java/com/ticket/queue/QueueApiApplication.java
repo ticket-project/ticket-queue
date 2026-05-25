@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @EnableScheduling
-@SpringBootApplication(scanBasePackages = {"com.ticket.queue", "com.ticket.support"})
+@SpringBootApplication
 public class QueueApiApplication {
 
     public static void main(final String[] args) {

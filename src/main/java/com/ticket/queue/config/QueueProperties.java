@@ -9,8 +9,9 @@ import org.springframework.stereotype.Component;
 @Getter
 @Setter
 @Component
-@ConfigurationProperties(prefix = "app.queue.api")
-public class QueueAdmissionProperties {
+@ConfigurationProperties(prefix = "app.queue")
+public class QueueProperties {
 
-    private Duration sessionTtl = Duration.ofHours(2);
+    private int admitLimitPerTick = 50;
+    private Duration activeTtl = Duration.ofMinutes(5);
 }
