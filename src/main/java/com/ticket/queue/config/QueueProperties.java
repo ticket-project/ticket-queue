@@ -13,5 +13,6 @@ import org.springframework.stereotype.Component;
 public class QueueProperties {
 
     private int admitLimitPerTick = 50;
+    private int maxActiveUsers = 1_000;
     private Duration activeTtl = Duration.ofMinutes(5);
 }

@@ -14,10 +14,23 @@ java {
 }
 
 repositories {
+    mavenLocal()
+    maven {
+        name = 'GitHubPackages'
+        url = uri('https://maven.pkg.github.com/ticket-project/ticket-common')
+        credentials {
+            username = findProperty('gpr.user') ?: System.getenv('GITHUB_ACTOR')
+            password = findProperty('gpr.key') ?: System.getenv('GITHUB_TOKEN')
+        }
+    }
     mavenCentral()
 }
 
 dependencies {
+    implementation 'com.ticket:ticket-common:0.0.1-SNAPSHOT'
+    implementation 'com.ticket:ticket-common-passport-spring-web:0.0.1-SNAPSHOT'
+    implementation 'com.ticket:ticket-support-security:0.0.1-SNAPSHOT'
+
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-validation'

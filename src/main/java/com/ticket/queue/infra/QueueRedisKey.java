@@ -18,6 +18,10 @@ public final class QueueRedisKey {
         return "queue:" + performanceHashTag(performanceId) + ":sequence";
     }
 
+    public static String policy(final Long performanceId) {
+        return "queue:" + performanceHashTag(performanceId) + ":policy";
+    }
+
     public static String memberState(final Long performanceId, final String queueSessionId) {
         return memberStatePrefix(performanceId) + queueSessionId;
     }

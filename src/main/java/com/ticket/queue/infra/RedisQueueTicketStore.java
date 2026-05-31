@@ -30,14 +30,21 @@ public class RedisQueueTicketStore implements QueueTicketStore {
     private static final String STATE_ACTIVE = "ACTIVE";
     private static final String ADMIT_WAITING_BATCH_SCRIPT = """
             local limit = tonumber(ARGV[1])
-            local activeTtlMillis = tonumber(ARGV[2])
-            local memberStatePrefix = ARGV[3]
+            local maxActiveUsers = tonumber(ARGV[2])
+            local activeTtlMillis = tonumber(ARGV[3])
+            local memberStatePrefix = ARGV[4]
             local time = redis.call('TIME')
             local nowMillis = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
             local activeExpiresAt = nowMillis + activeTtlMillis
             local admitted = 0
             redis.call('ZREMRANGEBYSCORE', KEYS[2], 0, nowMillis)
-            local candidates = redis.call('ZRANGE', KEYS[1], 0, limit - 1)
+            local activeCount = redis.call('ZCARD', KEYS[2])
+            local available = maxActiveUsers - activeCount
+            if available <= 0 then
+              return 0
+            end
+            local batchLimit = math.min(limit, available)
+            local candidates = redis.call('ZRANGE', KEYS[1], 0, batchLimit - 1)
 
             for _, queueSessionId in ipairs(candidates) do
               local stateKey = memberStatePrefix .. queueSessionId
@@ -150,7 +157,6 @@ public class RedisQueueTicketStore implements QueueTicketStore {
                         performanceId,
                         queueSessionId,
                         QueueEntryStatus.ADMITTED,
-                        null,
                         Duration.ofMillis(Math.max(1L, activeExpiresAt.longValue() - nowMillis))
                 ));
             }
@@ -162,8 +168,7 @@ public class RedisQueueTicketStore implements QueueTicketStore {
             return Optional.of(new QueueTicket(
                     performanceId,
                     queueSessionId,
-                    QueueEntryStatus.WAITING,
-                    rank.longValue() + 1L
+                    QueueEntryStatus.WAITING
             ));
         }
         return Optional.empty();
@@ -181,10 +186,11 @@ public class RedisQueueTicketStore implements QueueTicketStore {
     public void admitWaitingBatch(
             final Long performanceId,
             final int limit,
+            final int maxActiveUsers,
             final Duration activeTtl
     ) {
         validatePositive(performanceId, "performanceId");
-        if (limit <= 0) {
+        if (limit <= 0 || maxActiveUsers <= 0) {
             return;
         }
 
@@ -195,6 +201,7 @@ public class RedisQueueTicketStore implements QueueTicketStore {
                 RScript.ReturnType.LONG,
                 List.of(QueueRedisKey.waiting(performanceId), QueueRedisKey.active(performanceId)),
                 limit,
+                maxActiveUsers,
                 activeTtlDuration.toMillis(),
                 QueueRedisKey.memberStatePrefix(performanceId)
         );

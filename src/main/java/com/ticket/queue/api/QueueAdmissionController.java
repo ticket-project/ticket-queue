@@ -1,9 +1,8 @@
 package com.ticket.queue.api;
 
 import com.ticket.queue.application.QueueAdmissionService;
+import com.ticket.support.passport.Passport;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -11,7 +10,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequiredArgsConstructor
@@ -25,12 +23,9 @@ public class QueueAdmissionController {
     @PostMapping("/{performanceId}/enter")
     public ResponseEntity<QueueStatusResponse> enter(
             @PathVariable final Long performanceId,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) final String authorizationHeader
+            final Passport passport
     ) {
-        if (authorizationHeader == null || authorizationHeader.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authorization header is required");
-        }
-        return ResponseEntity.ok(queueAdmissionService.enter(performanceId, authorizationHeader));
+        return ResponseEntity.ok(queueAdmissionService.enter(performanceId, passport));
     }
 
     @GetMapping("/{performanceId}/status")

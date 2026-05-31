@@ -3,6 +3,7 @@ package com.ticket.queue.application;
 import com.ticket.queue.domain.QueueEntryStatus;
 import com.ticket.queue.domain.QueueTicket;
 import com.ticket.queue.domain.QueueTicketStore;
+import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -12,25 +13,28 @@ public class QueueStatusReader {
 
     private final QueueTicketStore queueTicketStore;
 
-    public GetQueueStatusUseCase.Output read(final Long performanceId, final String queueSessionId) {
+    public Result read(final Long performanceId, final String queueSessionId) {
         return queueTicketStore.findTicket(performanceId, queueSessionId)
                 .map(ticket -> read(performanceId, queueSessionId, ticket))
-                .orElseGet(() -> new GetQueueStatusUseCase.Output(QueueEntryStatus.EXPIRED, null, null));
+                .orElseGet(() -> new Result(QueueEntryStatus.EXPIRED, null, null));
     }
 
-    private GetQueueStatusUseCase.Output read(
+    private Result read(
             final Long performanceId,
             final String queueSessionId,
             final QueueTicket ticket
     ) {
         if (ticket.isWaiting()) {
             return queueTicketStore.findWaitingPosition(performanceId, queueSessionId)
-                    .map(position -> new GetQueueStatusUseCase.Output(QueueEntryStatus.WAITING, position, null))
-                    .orElseGet(() -> new GetQueueStatusUseCase.Output(QueueEntryStatus.EXPIRED, null, null));
+                    .map(position -> new Result(QueueEntryStatus.WAITING, position, null))
+                    .orElseGet(() -> new Result(QueueEntryStatus.EXPIRED, null, null));
         }
         if (ticket.isAdmitted()) {
-            return new GetQueueStatusUseCase.Output(QueueEntryStatus.ADMITTED, null, ticket.activeTtl());
+            return new Result(QueueEntryStatus.ADMITTED, null, ticket.activeTtl());
         }
-        return new GetQueueStatusUseCase.Output(QueueEntryStatus.EXPIRED, null, null);
+        return new Result(QueueEntryStatus.EXPIRED, null, null);
+    }
+
+    public record Result(QueueEntryStatus status, Long position, Duration activeTtl) {
     }
 }

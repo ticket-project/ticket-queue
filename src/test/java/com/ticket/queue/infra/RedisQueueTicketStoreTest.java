@@ -146,6 +146,7 @@ class RedisQueueTicketStoreTest {
         store.admitWaitingBatch(
                 1L,
                 2,
+                300,
                 Duration.ofMinutes(5)
         );
 
@@ -159,7 +160,7 @@ class RedisQueueTicketStoreTest {
         assertThat(keysCaptor.getValue())
                 .containsExactly(QueueRedisKey.waiting(1L), QueueRedisKey.active(1L));
         assertThat(argsCaptor.getValue())
-                .containsExactly(2, 300_000L, "queue:{1}:member:");
+                .containsExactly(2, 300, 300_000L, "queue:{1}:member:");
     }
 
     @Test

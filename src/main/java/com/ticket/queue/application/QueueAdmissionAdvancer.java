@@ -15,13 +15,14 @@ public class QueueAdmissionAdvancer {
 
     @DistributedLock(prefix = "queue:advance", dynamicKey = "#performanceId", leaseTime = 5_000L)
     public void advance(final Long performanceId) {
-        QueuePolicy policy = queuePolicyResolver.resolve();
+        QueuePolicy policy = queuePolicyResolver.resolve(performanceId);
         if (policy.admitLimitPerTick() <= 0) {
             return;
         }
         queueTicketStore.admitWaitingBatch(
                 performanceId,
                 policy.admitLimitPerTick(),
+                policy.maxActiveUsers(),
                 policy.activeTtl()
         );
     }

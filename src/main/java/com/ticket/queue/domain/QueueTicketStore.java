@@ -21,6 +21,7 @@ public interface QueueTicketStore {
     void admitWaitingBatch(
             Long performanceId,
             int limit,
+            int maxActiveUsers,
             Duration activeTtl
     );
 }

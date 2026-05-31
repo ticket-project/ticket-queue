@@ -15,13 +15,13 @@ class QueueAdmissionAdvancerTest {
         QueuePolicyResolver policyResolver = org.mockito.Mockito.mock(QueuePolicyResolver.class);
         QueueTicketStore queueTicketStore = org.mockito.Mockito.mock(QueueTicketStore.class);
         QueueAdmissionAdvancer advancer = new QueueAdmissionAdvancer(policyResolver, queueTicketStore);
-        QueuePolicy policy = new QueuePolicy(2, Duration.ofMinutes(5));
+        QueuePolicy policy = new QueuePolicy(2, 10, Duration.ofMinutes(5), Duration.ofHours(1));
 
-        when(policyResolver.resolve()).thenReturn(policy);
+        when(policyResolver.resolve(1L)).thenReturn(policy);
 
         advancer.advance(1L);
 
-        verify(queueTicketStore).admitWaitingBatch(1L, 2, policy.activeTtl());
+        verify(queueTicketStore).admitWaitingBatch(1L, 2, 10, policy.activeTtl());
     }
 
     @Test
@@ -29,12 +29,12 @@ class QueueAdmissionAdvancerTest {
         QueuePolicyResolver policyResolver = org.mockito.Mockito.mock(QueuePolicyResolver.class);
         QueueTicketStore queueTicketStore = org.mockito.Mockito.mock(QueueTicketStore.class);
         QueueAdmissionAdvancer advancer = new QueueAdmissionAdvancer(policyResolver, queueTicketStore);
-        QueuePolicy policy = new QueuePolicy(50, Duration.ofMinutes(5));
+        QueuePolicy policy = new QueuePolicy(50, 300, Duration.ofMinutes(5), Duration.ofHours(1));
 
-        when(policyResolver.resolve()).thenReturn(policy);
+        when(policyResolver.resolve(1L)).thenReturn(policy);
 
         advancer.advance(1L);
 
-        verify(queueTicketStore).admitWaitingBatch(1L, 50, policy.activeTtl());
+        verify(queueTicketStore).admitWaitingBatch(1L, 50, 300, policy.activeTtl());
     }
 }

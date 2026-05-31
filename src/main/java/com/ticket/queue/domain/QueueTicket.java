@@ -6,17 +6,15 @@ public record QueueTicket(
         Long performanceId,
         String queueSessionId,
         QueueEntryStatus status,
-        Long sequence,
         Duration activeTtl
 ) {
 
     public QueueTicket(
             final Long performanceId,
             final String queueSessionId,
-            final QueueEntryStatus status,
-            final Long sequence
+            final QueueEntryStatus status
     ) {
-        this(performanceId, queueSessionId, status, sequence, null);
+        this(performanceId, queueSessionId, status, null);
     }
 
     public QueueTicket {

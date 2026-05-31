@@ -12,9 +12,11 @@ spring:
         nodes: ${QUEUE_REDIS_CLUSTER_NODES:}
 
 security:
-  jwt:
-    issuer: ${JWT_ISSUER:ticket}
-    secret-key: ${JWT_SECRET}
+  internal-auth:
+    issuer: ${INTERNAL_AUTH_ISSUER:ticket-gateway}
+    audience: ${INTERNAL_AUTH_QUEUE_AUDIENCE:ticket-queue}
+    secret-key: ${INTERNAL_AUTH_SECRET_KEY:abcdefabcdefabcdefabcdefabcdef12}
+    expiration-seconds: ${INTERNAL_AUTH_EXPIRATION_SECONDS:60}
   admission:
     issuer: ${ADMISSION_TOKEN_ISSUER:ticket-queue}
     audience: ${ADMISSION_TOKEN_AUDIENCE:ticket-api}
@@ -23,6 +25,7 @@ security:
 app:
   queue:
     admit-limit-per-tick: ${QUEUE_ADMIT_LIMIT_PER_TICK:50}
+    max-active-users: ${QUEUE_MAX_ACTIVE_USERS:1000}
     active-ttl: ${QUEUE_ACTIVE_TTL:5m}
     advance-interval-ms: ${QUEUE_ADVANCE_INTERVAL_MS:1000}
     api:
