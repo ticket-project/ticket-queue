@@ -12,8 +12,6 @@ public interface QueueTicketStore {
 
     Optional<QueueSession> findSession(String queueSessionId);
 
-    Optional<Long> findWaitingPosition(Long performanceId, String queueSessionId);
-
     Optional<QueueTicket> findTicket(Long performanceId, String queueSessionId);
 
     Set<Long> findWaitingPerformanceIds();

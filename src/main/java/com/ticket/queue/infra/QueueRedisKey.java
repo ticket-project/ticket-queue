@@ -42,6 +42,10 @@ public final class QueueRedisKey {
         return "queue:waiting:performances";
     }
 
+    public static String advanceLock(final Long performanceId) {
+        return "lock:queue:advance:" + performanceId;
+    }
+
     private static String performanceHashTag(final Long performanceId) {
         return "{" + performanceId + "}";
     }

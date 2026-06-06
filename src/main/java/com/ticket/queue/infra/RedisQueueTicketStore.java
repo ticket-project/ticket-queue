@@ -11,10 +11,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.redisson.api.RAtomicLong;
 import org.redisson.api.RBucket;
+import org.redisson.api.RLock;
 import org.redisson.api.RScript;
 import org.redisson.api.RScoredSortedSet;
 import org.redisson.api.RSet;
@@ -28,6 +30,7 @@ public class RedisQueueTicketStore implements QueueTicketStore {
 
     private static final String STATE_WAITING = "WAITING";
     private static final String STATE_ACTIVE = "ACTIVE";
+    private static final long ADVANCE_LOCK_LEASE_MILLIS = 5_000L;
     private static final String ADMIT_WAITING_BATCH_SCRIPT = """
             local limit = tonumber(ARGV[1])
             local maxActiveUsers = tonumber(ARGV[2])
@@ -136,15 +139,6 @@ public class RedisQueueTicketStore implements QueueTicketStore {
     }
 
     @Override
-    public Optional<Long> findWaitingPosition(final Long performanceId, final String queueSessionId) {
-        Integer rank = waitingSet(performanceId).rank(queueSessionId);
-        if (rank == null) {
-            return Optional.empty();
-        }
-        return Optional.of(rank.longValue() + 1L);
-    }
-
-    @Override
     public Optional<QueueTicket> findTicket(final Long performanceId, final String queueSessionId) {
         RBucket<String> stateBucket = memberStateBucket(performanceId, queueSessionId);
         RScoredSortedSet<String> activeSet = activeSet(performanceId);
@@ -168,7 +162,9 @@ public class RedisQueueTicketStore implements QueueTicketStore {
             return Optional.of(new QueueTicket(
                     performanceId,
                     queueSessionId,
-                    QueueEntryStatus.WAITING
+                    QueueEntryStatus.WAITING,
+                    null,
+                    rank.longValue() + 1L
             ));
         }
         return Optional.empty();
@@ -194,18 +190,37 @@ public class RedisQueueTicketStore implements QueueTicketStore {
             return;
         }
 
-        Duration activeTtlDuration = ttlDuration(activeTtl);
-        redissonClient.getScript(StringCodec.INSTANCE).eval(
-                RScript.Mode.READ_WRITE,
-                ADMIT_WAITING_BATCH_SCRIPT,
-                RScript.ReturnType.LONG,
-                List.of(QueueRedisKey.waiting(performanceId), QueueRedisKey.active(performanceId)),
-                limit,
-                maxActiveUsers,
-                activeTtlDuration.toMillis(),
-                QueueRedisKey.memberStatePrefix(performanceId)
-        );
-        removeWaitingPerformanceIfEmpty(performanceId);
+        RLock lock = redissonClient.getLock(QueueRedisKey.advanceLock(performanceId));
+        if (!tryAdvanceLock(lock)) {
+            return;
+        }
+        try {
+            Duration activeTtlDuration = ttlDuration(activeTtl);
+            redissonClient.getScript(StringCodec.INSTANCE).eval(
+                    RScript.Mode.READ_WRITE,
+                    ADMIT_WAITING_BATCH_SCRIPT,
+                    RScript.ReturnType.LONG,
+                    List.of(QueueRedisKey.waiting(performanceId), QueueRedisKey.active(performanceId)),
+                    limit,
+                    maxActiveUsers,
+                    activeTtlDuration.toMillis(),
+                    QueueRedisKey.memberStatePrefix(performanceId)
+            );
+            removeWaitingPerformanceIfEmpty(performanceId);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+
+    private boolean tryAdvanceLock(final RLock lock) {
+        try {
+            return lock.tryLock(0L, ADVANCE_LOCK_LEASE_MILLIS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
     private RScoredSortedSet<String> waitingSet(final Long performanceId) {

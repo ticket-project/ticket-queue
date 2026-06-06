@@ -26,8 +26,7 @@ class QueueStatusReaderTest {
     @Test
     void waiting_member는_zrank_기준_순번을_반환한다() {
         when(queueTicketStore.findTicket(1L, "session-1"))
-                .thenReturn(Optional.of(new QueueTicket(1L, "session-1", QueueEntryStatus.WAITING)));
-        when(queueTicketStore.findWaitingPosition(1L, "session-1")).thenReturn(Optional.of(3L));
+                .thenReturn(Optional.of(new QueueTicket(1L, "session-1", QueueEntryStatus.WAITING, null, 3L)));
 
         QueueStatusReader.Result output = queueStatusReader.read(1L, "session-1");
 

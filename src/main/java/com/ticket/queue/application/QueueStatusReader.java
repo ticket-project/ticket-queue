@@ -15,19 +15,13 @@ public class QueueStatusReader {
 
     public Result read(final Long performanceId, final String queueSessionId) {
         return queueTicketStore.findTicket(performanceId, queueSessionId)
-                .map(ticket -> read(performanceId, queueSessionId, ticket))
+                .map(this::read)
                 .orElseGet(() -> new Result(QueueEntryStatus.EXPIRED, null, null));
     }
 
-    private Result read(
-            final Long performanceId,
-            final String queueSessionId,
-            final QueueTicket ticket
-    ) {
+    private Result read(final QueueTicket ticket) {
         if (ticket.isWaiting()) {
-            return queueTicketStore.findWaitingPosition(performanceId, queueSessionId)
-                    .map(position -> new Result(QueueEntryStatus.WAITING, position, null))
-                    .orElseGet(() -> new Result(QueueEntryStatus.EXPIRED, null, null));
+            return new Result(QueueEntryStatus.WAITING, ticket.position(), null);
         }
         if (ticket.isAdmitted()) {
             return new Result(QueueEntryStatus.ADMITTED, null, ticket.activeTtl());

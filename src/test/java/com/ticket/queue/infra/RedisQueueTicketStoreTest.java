@@ -17,10 +17,12 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.redisson.api.RAtomicLong;
 import org.redisson.api.RBucket;
+import org.redisson.api.RLock;
 import org.redisson.api.RScript;
 import org.redisson.api.RScoredSortedSet;
 import org.redisson.api.RSet;
@@ -122,15 +124,19 @@ class RedisQueueTicketStoreTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void admitWaitingBatch는_Lua_script로_waiting_active_state를_원자적으로_변경한다() {
+    void admitWaitingBatch는_Lua_script로_waiting_active_state를_원자적으로_변경한다() throws InterruptedException {
         RedissonClient redissonClient = mock(RedissonClient.class);
         UuidSupplier uuidSupplier = mock(UuidSupplier.class);
         RScript script = mock(RScript.class);
         RScoredSortedSet<String> waitingSet = mock(RScoredSortedSet.class);
+        RLock lock = mock(RLock.class);
         RedisQueueTicketStore store = new RedisQueueTicketStore(redissonClient, uuidSupplier);
         ArgumentCaptor<List<Object>> keysCaptor = ArgumentCaptor.forClass(List.class);
         ArgumentCaptor<Object[]> argsCaptor = ArgumentCaptor.forClass(Object[].class);
 
+        when(redissonClient.getLock(QueueRedisKey.advanceLock(1L))).thenReturn(lock);
+        when(lock.tryLock(0L, 5_000L, TimeUnit.MILLISECONDS)).thenReturn(true);
+        when(lock.isHeldByCurrentThread()).thenReturn(true);
         when(redissonClient.getScript(StringCodec.INSTANCE)).thenReturn(script);
         when(redissonClient.<String>getScoredSortedSet(QueueRedisKey.waiting(1L), StringCodec.INSTANCE))
                 .thenReturn(waitingSet);
@@ -185,5 +191,48 @@ class RedisQueueTicketStoreTest {
         assertThat(actual.get().status()).isEqualTo(QueueEntryStatus.ADMITTED);
         assertThat(actual.get().activeTtl()).isNotNull();
         assertThat(actual.get().activeTtl()).isPositive();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void findTicket은_waiting_member의_순번을_position으로_반환한다() {
+        RedissonClient redissonClient = mock(RedissonClient.class);
+        UuidSupplier uuidSupplier = mock(UuidSupplier.class);
+        RScoredSortedSet<String> activeSet = mock(RScoredSortedSet.class);
+        RScoredSortedSet<String> waitingSet = mock(RScoredSortedSet.class);
+        RBucket<String> stateBucket = mock(RBucket.class);
+        RedisQueueTicketStore store = new RedisQueueTicketStore(redissonClient, uuidSupplier);
+
+        when(redissonClient.<String>getScoredSortedSet(QueueRedisKey.active(1L), StringCodec.INSTANCE))
+                .thenReturn(activeSet);
+        when(redissonClient.<String>getScoredSortedSet(QueueRedisKey.waiting(1L), StringCodec.INSTANCE))
+                .thenReturn(waitingSet);
+        when(redissonClient.<String>getBucket(QueueRedisKey.memberState(1L, "session-1"), StringCodec.INSTANCE))
+                .thenReturn(stateBucket);
+        when(activeSet.getScore("session-1")).thenReturn(null);
+        when(waitingSet.rank("session-1")).thenReturn(2);
+
+        Optional<QueueTicket> actual = store.findTicket(1L, "session-1");
+
+        assertThat(actual).isPresent();
+        assertThat(actual.get().status()).isEqualTo(QueueEntryStatus.WAITING);
+        assertThat(actual.get().position()).isEqualTo(3L);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void admitWaitingBatch는_락_획득_실패시_승격하지_않고_건너뛴다() throws InterruptedException {
+        RedissonClient redissonClient = mock(RedissonClient.class);
+        UuidSupplier uuidSupplier = mock(UuidSupplier.class);
+        RLock lock = mock(RLock.class);
+        RedisQueueTicketStore store = new RedisQueueTicketStore(redissonClient, uuidSupplier);
+
+        when(redissonClient.getLock(QueueRedisKey.advanceLock(1L))).thenReturn(lock);
+        when(lock.tryLock(0L, 5_000L, TimeUnit.MILLISECONDS)).thenReturn(false);
+
+        store.admitWaitingBatch(1L, 2, 300, Duration.ofMinutes(5));
+
+        verify(redissonClient, never()).getScript(StringCodec.INSTANCE);
+        verify(lock, never()).unlock();
     }
 }

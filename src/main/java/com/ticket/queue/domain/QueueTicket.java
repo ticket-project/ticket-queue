@@ -6,7 +6,8 @@ public record QueueTicket(
         Long performanceId,
         String queueSessionId,
         QueueEntryStatus status,
-        Duration activeTtl
+        Duration activeTtl,
+        Long position
 ) {
 
     public QueueTicket(
@@ -14,7 +15,16 @@ public record QueueTicket(
             final String queueSessionId,
             final QueueEntryStatus status
     ) {
-        this(performanceId, queueSessionId, status, null);
+        this(performanceId, queueSessionId, status, null, null);
+    }
+
+    public QueueTicket(
+            final Long performanceId,
+            final String queueSessionId,
+            final QueueEntryStatus status,
+            final Duration activeTtl
+    ) {
+        this(performanceId, queueSessionId, status, activeTtl, null);
     }
 
     public QueueTicket {
