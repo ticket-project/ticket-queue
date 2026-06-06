@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Setter
 @Component
 @ConfigurationProperties(prefix = "security.internal-auth")
-public class InternalAuthProperties {
+public class PassportProperties {
 
     private String issuer = "ticket-gateway";
     private String audience = "ticket-queue";

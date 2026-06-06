@@ -12,8 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.ticket.queue.application.QueueAdmissionService;
 import com.ticket.support.passport.Passport;
-import com.ticket.support.passport.web.InternalAuthPassportFilter;
-import com.ticket.support.passport.web.InternalAuthPassportVerifier;
+import com.ticket.support.passport.web.PassportAuthenticationFilter;
+import com.ticket.support.passport.web.PassportVerifier;
 import com.ticket.support.passport.web.PassportArgumentResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,16 +25,16 @@ class QueueAdmissionControllerTest {
     private static final String INTERNAL_AUTH_HEADER = "X-Internal-Auth";
 
     private QueueAdmissionService queueAdmissionService;
-    private InternalAuthPassportVerifier internalAuthVerifier;
+    private PassportVerifier internalAuthVerifier;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         queueAdmissionService = mock(QueueAdmissionService.class);
-        internalAuthVerifier = mock(InternalAuthPassportVerifier.class);
+        internalAuthVerifier = mock(PassportVerifier.class);
         mockMvc = MockMvcBuilders.standaloneSetup(new QueueAdmissionController(queueAdmissionService))
                 .setCustomArgumentResolvers(new PassportArgumentResolver())
-                .addFilters(new InternalAuthPassportFilter(internalAuthVerifier))
+                .addFilters(new PassportAuthenticationFilter(internalAuthVerifier))
                 .build();
     }
 
