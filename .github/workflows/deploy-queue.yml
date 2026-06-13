@@ -1,0 +1,85 @@
+name: Deploy Queue
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Test and package
+        run: ./gradlew test bootJar
+
+      - name: Prepare deployment artifact
+        run: |
+          mkdir -p deploy-artifact/app deploy-artifact/nginx
+          cp build/libs/*.jar deploy-artifact/app/ticket-queue.jar
+          cp deploy/docker-compose.yml deploy-artifact/docker-compose.yml
+          cp deploy/nginx/default.conf deploy-artifact/nginx/default.conf
+
+      - name: Upload deployment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ticket-queue-deploy
+          path: deploy-artifact
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: azure-queue
+
+    steps:
+      - name: Download deployment artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ticket-queue-deploy
+          path: deploy-artifact
+
+      - name: Copy artifact to Azure VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          port: ${{ secrets.AZURE_VM_PORT || '22' }}
+          source: "deploy-artifact/*"
+          target: "/opt/ticket-queue"
+          strip_components: 1
+
+      - name: Restart queue stack
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          port: ${{ secrets.AZURE_VM_PORT || '22' }}
+          script: |
+            set -e
+            cd /opt/ticket-queue
+            mkdir -p public-state/queue-state/performances
+            test -f .env
+            docker compose up -d --remove-orphans
+            docker image prune -f
