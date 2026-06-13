@@ -12,7 +12,11 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app.queue")
 public class QueueProperties {
 
-    private int admitLimitPerTick = 50;
-    private int maxActiveUsers = 1_000;
-    private Duration activeTtl = Duration.ofMinutes(5);
+    private Duration defaultQueueTtl = Duration.ofHours(24);
+    private Duration shoppingSessionTtl = Duration.ofMinutes(15);
+    private int defaultMaxActiveSessions = 5_000;
+    private int defaultMaxAdmitPerSecond = 500;
+    private long defaultRefreshAfterMs = 5_000L;
+    private String queueTokenSecret;
+    private boolean schedulerEnabled = true;
 }

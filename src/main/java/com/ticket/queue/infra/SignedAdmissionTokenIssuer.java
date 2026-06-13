@@ -1,6 +1,6 @@
 package com.ticket.queue.infra;
 
-import com.ticket.queue.application.QueueAdmissionTokenIssuer;
+import com.ticket.queue.application.AdmissionTokenIssuer;
 import com.ticket.queue.config.AdmissionTokenProperties;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -15,7 +15,7 @@ import javax.crypto.SecretKey;
 import org.springframework.stereotype.Component;
 
 @Component
-public class SignedAdmissionTokenIssuer implements QueueAdmissionTokenIssuer {
+public class SignedAdmissionTokenIssuer implements AdmissionTokenIssuer {
 
     private static final String PERFORMANCE_ID_CLAIM = "performanceId";
     private static final String SCOPE_CLAIM = "scope";
@@ -37,9 +37,9 @@ public class SignedAdmissionTokenIssuer implements QueueAdmissionTokenIssuer {
     }
 
     @Override
-    public String issue(final Long performanceId, final String queueSessionId, final Duration ttl) {
+    public String issue(final Long performanceId, final String queueId, final Duration ttl) {
         validatePositive(performanceId, "performanceId");
-        validateNotBlank(queueSessionId, "queueSessionId");
+        validateNotBlank(queueId, "queueId");
         validateTtl(ttl);
 
         Instant issuedAt = clock.instant();
@@ -50,7 +50,7 @@ public class SignedAdmissionTokenIssuer implements QueueAdmissionTokenIssuer {
                 .audience()
                 .add(properties.getAudience())
                 .and()
-                .subject(queueSessionId)
+                .subject(queueId)
                 .claim(PERFORMANCE_ID_CLAIM, performanceId)
                 .claim(SCOPE_CLAIM, SCOPE)
                 .issuedAt(Date.from(issuedAt))

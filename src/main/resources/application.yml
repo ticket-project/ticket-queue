@@ -15,20 +15,22 @@ security:
   internal-auth:
     issuer: ${INTERNAL_AUTH_ISSUER:ticket-gateway}
     audience: ${INTERNAL_AUTH_QUEUE_AUDIENCE:ticket-queue}
-    secret-key: ${INTERNAL_AUTH_SECRET_KEY:abcdefabcdefabcdefabcdefabcdef12}
+    secret-key: ${INTERNAL_AUTH_SECRET_KEY}
     expiration-seconds: ${INTERNAL_AUTH_EXPIRATION_SECONDS:60}
   admission:
     issuer: ${ADMISSION_TOKEN_ISSUER:ticket-queue}
     audience: ${ADMISSION_TOKEN_AUDIENCE:ticket-api}
-    secret-key: ${ADMISSION_TOKEN_SECRET_KEY:0123456789abcdef0123456789abcdef}
+    secret-key: ${ADMISSION_TOKEN_SECRET_KEY}
 
 app:
   queue:
-    admit-limit-per-tick: ${QUEUE_ADMIT_LIMIT_PER_TICK:50}
-    max-active-users: ${QUEUE_MAX_ACTIVE_USERS:1000}
-    active-ttl: ${QUEUE_ACTIVE_TTL:5m}
+    default-queue-ttl: ${QUEUE_DEFAULT_QUEUE_TTL:24h}
+    shopping-session-ttl: ${QUEUE_SHOPPING_SESSION_TTL:15m}
+    default-max-active-sessions: ${QUEUE_DEFAULT_MAX_ACTIVE_SESSIONS:5000}
+    default-max-admit-per-second: ${QUEUE_DEFAULT_MAX_ADMIT_PER_SECOND:500}
+    default-refresh-after-ms: ${QUEUE_DEFAULT_REFRESH_AFTER_MS:5000}
+    queue-token-secret: ${QUEUE_TOKEN_SECRET}
+    scheduler-enabled: ${QUEUE_SCHEDULER_ENABLED:true}
     advance-interval-ms: ${QUEUE_ADVANCE_INTERVAL_MS:1000}
-    api:
-      session-ttl: ${QUEUE_SESSION_TTL:2h}
     redirect:
       ticketing-url-template: ${QUEUE_TICKETING_URL_TEMPLATE:/booking/seat?performanceId={performanceId}}

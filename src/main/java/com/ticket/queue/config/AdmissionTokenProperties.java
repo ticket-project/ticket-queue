@@ -14,7 +14,7 @@ public class AdmissionTokenProperties {
 
     private String issuer = "ticket-queue";
     private String audience = "ticket-api";
-    private String secretKey = "0123456789abcdef0123456789abcdef";
+    private String secretKey;
 
     public void validate() {
         if (issuer == null || issuer.isBlank()) {
