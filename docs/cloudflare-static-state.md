@@ -24,9 +24,9 @@ User
 운영 환경변수:
 
 ```bash
-QUEUE_PUBLIC_STATE_OUTPUT_DIRECTORY=/var/www/ticket-queue-public
-QUEUE_PUBLIC_STATE_PATH_TEMPLATE=queue-state/performances/{performanceId}.json
-QUEUE_SCHEDULER_ENABLED=true
+APP_QUEUE_PUBLIC_STATE_OUTPUT_DIRECTORY=/var/www/ticket-queue-public
+APP_QUEUE_PUBLIC_STATE_PATH_TEMPLATE=queue-state/performances/{performanceId}.json
+APP_QUEUE_SCHEDULER_ENABLED=true
 ```
 
 생성 파일:
