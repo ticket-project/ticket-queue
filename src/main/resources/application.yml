@@ -4,35 +4,15 @@ server:
 spring:
   application:
     name: ticket-queue
-  data:
-    redis:
-      host: ${QUEUE_REDIS_HOST:localhost}
-      port: ${QUEUE_REDIS_PORT:6379}
-      cluster:
-        nodes: ${QUEUE_REDIS_CLUSTER_NODES:}
 
 security:
   internal-auth:
-    issuer: ${INTERNAL_AUTH_ISSUER:ticket-gateway}
-    audience: ${INTERNAL_AUTH_QUEUE_AUDIENCE:ticket-queue}
-    secret-key: ${INTERNAL_AUTH_SECRET_KEY:32-byte-minimum-real-secret}
-    expiration-seconds: ${INTERNAL_AUTH_EXPIRATION_SECONDS:60}
+    issuer: ticket-gateway
+    audience: ticket-queue
+    secret-key: ${INTERNAL_AUTH_SECRET_KEY}
   admission:
-    issuer: ${ADMISSION_TOKEN_ISSUER:ticket-queue}
-    audience: ${ADMISSION_TOKEN_AUDIENCE:ticket-api}
     secret-key: ${ADMISSION_TOKEN_SECRET_KEY}
 
 app:
   queue:
-    default-queue-ttl: ${QUEUE_DEFAULT_QUEUE_TTL:24h}
-    shopping-session-ttl: ${QUEUE_SHOPPING_SESSION_TTL:15m}
-    default-max-active-sessions: ${QUEUE_DEFAULT_MAX_ACTIVE_SESSIONS:5000}
-    default-max-admit-per-second: ${QUEUE_DEFAULT_MAX_ADMIT_PER_SECOND:500}
-    default-refresh-after-ms: ${QUEUE_DEFAULT_REFRESH_AFTER_MS:5000}
     queue-token-secret: ${QUEUE_TOKEN_SECRET}
-    scheduler-enabled: ${QUEUE_SCHEDULER_ENABLED:true}
-    advance-interval-ms: ${QUEUE_ADVANCE_INTERVAL_MS:1000}
-    public-state-output-directory: ${QUEUE_PUBLIC_STATE_OUTPUT_DIRECTORY:build/public-state}
-    public-state-path-template: ${QUEUE_PUBLIC_STATE_PATH_TEMPLATE:queue-state/performances/{performanceId}.json}
-    redirect:
-      ticketing-url-template: ${QUEUE_TICKETING_URL_TEMPLATE:/booking/seat?performanceId={performanceId}}
