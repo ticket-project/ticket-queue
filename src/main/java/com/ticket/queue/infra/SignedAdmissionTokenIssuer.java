@@ -43,8 +43,15 @@ public class SignedAdmissionTokenIssuer implements AdmissionTokenIssuer {
         validateTtl(ttl);
 
         Instant issuedAt = clock.instant();
-        Instant expiresAt = issuedAt.plus(ttl);
+        return buildToken(performanceId, queueId, issuedAt, issuedAt.plus(ttl));
+    }
 
+    private String buildToken(
+            final Long performanceId,
+            final String queueId,
+            final Instant issuedAt,
+            final Instant expiresAt
+    ) {
         return Jwts.builder()
                 .issuer(properties.getIssuer())
                 .audience()

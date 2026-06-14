@@ -1,0 +1,45 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: ticket-queue-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    expose:
+      - "6379"
+
+  queue:
+    image: ${DOCKER_IMAGE:?DOCKER_IMAGE is required}
+    container_name: ticket-queue
+    restart: unless-stopped
+    depends_on:
+      - redis
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      QUEUE_REDIS_HOST: redis
+      QUEUE_REDIS_PORT: 6379
+      QUEUE_PUBLIC_STATE_OUTPUT_DIRECTORY: /public-state
+      QUEUE_PUBLIC_STATE_PATH_TEMPLATE: queue-state/performances/{performanceId}.json
+      QUEUE_SCHEDULER_ENABLED: ${QUEUE_SCHEDULER_ENABLED:-true}
+    volumes:
+      - ./public-state:/public-state
+    expose:
+      - "8090"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ticket-queue-nginx
+    restart: unless-stopped
+    depends_on:
+      - queue
+    ports:
+      - "80:80"
+    volumes:
+      - ./public-state:/usr/share/nginx/html:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  redis-data:

@@ -1,5 +1,6 @@
 package com.ticket.queue.config;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import lombok.Getter;
 import lombok.Setter;
@@ -19,4 +20,6 @@ public class QueueProperties {
     private long defaultRefreshAfterMs = 5_000L;
     private String queueTokenSecret;
     private boolean schedulerEnabled = true;
+    private Path publicStateOutputDirectory = Path.of("build/public-state");
+    private String publicStatePathTemplate = "queue-state/performances/{performanceId}.json";
 }

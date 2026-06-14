@@ -8,16 +8,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.ticket.queue.api.EnterResponse;
-import com.ticket.queue.api.JoinResponse;
-import com.ticket.queue.api.PublicStateResponse;
+import com.ticket.queue.api.dto.EnterResponse;
+import com.ticket.queue.api.dto.JoinResponse;
+import com.ticket.queue.api.dto.PublicStateResponse;
 import com.ticket.queue.config.QueueProperties;
 import com.ticket.queue.config.RedirectProperties;
-import com.ticket.queue.domain.JoinResult;
-import com.ticket.queue.domain.Policy;
-import com.ticket.queue.domain.EnterResult;
-import com.ticket.queue.domain.PublicState;
 import com.ticket.queue.domain.AdmissionStateStore;
+import com.ticket.queue.domain.EnterResult;
+import com.ticket.queue.domain.JoinResult;
+import com.ticket.queue.domain.PublicState;
 import com.ticket.queue.domain.UuidSupplier;
 import com.ticket.support.passport.Passport;
 import java.time.Duration;
@@ -37,13 +36,10 @@ class AdmissionServiceTest {
     private AdmissionStateStore admissionStateStore;
 
     @Mock
-    private PolicyResolver policyResolver;
-
-    @Mock
     private QueueTokenService queueTokenService;
 
     @Mock
-    private AdmissionTokenIssuer queueAdmissionTokenIssuer;
+    private AdmissionTokenIssuer admissionTokenIssuer;
 
     @Mock
     private UuidSupplier uuidSupplier;
@@ -54,12 +50,14 @@ class AdmissionServiceTest {
     void setUp() {
         QueueProperties queueProperties = new QueueProperties();
         queueProperties.setDefaultRefreshAfterMs(5_000L);
+        queueProperties.setDefaultQueueTtl(Duration.ofHours(24));
+        queueProperties.setShoppingSessionTtl(Duration.ofMinutes(15));
+        queueProperties.setDefaultMaxActiveSessions(5_000);
         RedirectProperties redirectProperties = new RedirectProperties();
         service = new AdmissionService(
                 admissionStateStore,
-                policyResolver,
                 queueTokenService,
-                queueAdmissionTokenIssuer,
+                admissionTokenIssuer,
                 redirectProperties,
                 queueProperties,
                 uuidSupplier
@@ -69,9 +67,7 @@ class AdmissionServiceTest {
     @Test
     void join_issues_sequence_and_queue_token() {
         Passport passport = new Passport(10L, "MEMBER");
-        Policy policy = new Policy(500, 5_000, Duration.ofMinutes(15), Duration.ofHours(24));
         UUID queueUuid = UUID.fromString("00000000-0000-0000-0000-000000000001");
-        when(policyResolver.resolve(1L)).thenReturn(policy);
         when(uuidSupplier.get()).thenReturn(queueUuid);
         when(admissionStateStore.joinQueue(eq(1L), anyString(), eq(queueUuid.toString()), eq(Duration.ofHours(24)), eq(5_000L)))
                 .thenReturn(new JoinResult(1L, queueUuid.toString(), 42L, true));
@@ -106,9 +102,7 @@ class AdmissionServiceTest {
     void enter_rejects_when_sequence_is_not_admitted_yet() {
         when(queueTokenService.verify("queue-token"))
                 .thenReturn(new QueueTokenClaims(1L, "queue-1", 101L));
-        when(policyResolver.resolve(1L))
-                .thenReturn(new Policy(500, 5_000, Duration.ofMinutes(15), Duration.ofHours(24)));
-        when(queueAdmissionTokenIssuer.issue(1L, "queue-1", Duration.ofMinutes(15)))
+        when(admissionTokenIssuer.issue(1L, "queue-1", Duration.ofMinutes(15)))
                 .thenReturn("candidate-admission-token");
         when(admissionStateStore.enterQueue(
                 1L,
@@ -128,9 +122,7 @@ class AdmissionServiceTest {
     void enter_returns_admission_token_when_sequence_is_admitted() {
         when(queueTokenService.verify("queue-token"))
                 .thenReturn(new QueueTokenClaims(1L, "queue-1", 100L));
-        when(policyResolver.resolve(1L))
-                .thenReturn(new Policy(500, 5_000, Duration.ofMinutes(15), Duration.ofHours(24)));
-        when(queueAdmissionTokenIssuer.issue(1L, "queue-1", Duration.ofMinutes(15)))
+        when(admissionTokenIssuer.issue(1L, "queue-1", Duration.ofMinutes(15)))
                 .thenReturn("candidate-admission-token");
         when(admissionStateStore.enterQueue(
                 1L,
@@ -153,9 +145,7 @@ class AdmissionServiceTest {
     void enter_is_idempotent_for_same_queue_id() {
         when(queueTokenService.verify("queue-token"))
                 .thenReturn(new QueueTokenClaims(1L, "queue-1", 100L));
-        when(policyResolver.resolve(1L))
-                .thenReturn(new Policy(500, 5_000, Duration.ofMinutes(15), Duration.ofHours(24)));
-        when(queueAdmissionTokenIssuer.issue(1L, "queue-1", Duration.ofMinutes(15)))
+        when(admissionTokenIssuer.issue(1L, "queue-1", Duration.ofMinutes(15)))
                 .thenReturn("candidate-admission-token");
         when(admissionStateStore.enterQueue(
                 1L,
@@ -175,9 +165,7 @@ class AdmissionServiceTest {
     void enter_returns_429_when_active_sessions_are_full() {
         when(queueTokenService.verify("queue-token"))
                 .thenReturn(new QueueTokenClaims(1L, "queue-1", 100L));
-        when(policyResolver.resolve(1L))
-                .thenReturn(new Policy(500, 5_000, Duration.ofMinutes(15), Duration.ofHours(24)));
-        when(queueAdmissionTokenIssuer.issue(1L, "queue-1", Duration.ofMinutes(15)))
+        when(admissionTokenIssuer.issue(1L, "queue-1", Duration.ofMinutes(15)))
                 .thenReturn("candidate-admission-token");
         when(admissionStateStore.enterQueue(
                 1L,
@@ -201,7 +189,7 @@ class AdmissionServiceTest {
                 .isThrownBy(() -> service.enter(1L, "bad-token"))
                 .satisfies(exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED));
 
-        verify(queueAdmissionTokenIssuer, never()).issue(1L, "queue-1", Duration.ofMinutes(15));
+        verify(admissionTokenIssuer, never()).issue(1L, "queue-1", Duration.ofMinutes(15));
         verify(admissionStateStore, never()).enterQueue(
                 eq(1L),
                 eq("queue-1"),

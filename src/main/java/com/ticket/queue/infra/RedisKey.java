@@ -6,10 +6,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class RedisKey {
 
-    public static String policy(final Long performanceId) {
-        return "queue:" + performanceHashTag(performanceId) + ":policy";
-    }
-
     public static String waitingPerformances() {
         return "queue:waiting:performances";
     }

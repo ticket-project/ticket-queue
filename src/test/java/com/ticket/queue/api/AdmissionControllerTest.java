@@ -9,6 +9,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.ticket.queue.api.dto.EnterResponse;
+import com.ticket.queue.api.dto.JoinResponse;
+import com.ticket.queue.api.dto.PublicStateResponse;
 import com.ticket.queue.application.AdmissionService;
 import com.ticket.support.passport.Passport;
 import com.ticket.support.passport.web.PassportArgumentResolver;

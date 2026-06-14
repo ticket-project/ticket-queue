@@ -15,7 +15,7 @@ security:
   internal-auth:
     issuer: ${INTERNAL_AUTH_ISSUER:ticket-gateway}
     audience: ${INTERNAL_AUTH_QUEUE_AUDIENCE:ticket-queue}
-    secret-key: ${INTERNAL_AUTH_SECRET_KEY}
+    secret-key: ${INTERNAL_AUTH_SECRET_KEY:32-byte-minimum-real-secret}
     expiration-seconds: ${INTERNAL_AUTH_EXPIRATION_SECONDS:60}
   admission:
     issuer: ${ADMISSION_TOKEN_ISSUER:ticket-queue}
@@ -32,5 +32,7 @@ app:
     queue-token-secret: ${QUEUE_TOKEN_SECRET}
     scheduler-enabled: ${QUEUE_SCHEDULER_ENABLED:true}
     advance-interval-ms: ${QUEUE_ADVANCE_INTERVAL_MS:1000}
+    public-state-output-directory: ${QUEUE_PUBLIC_STATE_OUTPUT_DIRECTORY:build/public-state}
+    public-state-path-template: ${QUEUE_PUBLIC_STATE_PATH_TEMPLATE:queue-state/performances/{performanceId}.json}
     redirect:
       ticketing-url-template: ${QUEUE_TICKETING_URL_TEMPLATE:/booking/seat?performanceId={performanceId}}

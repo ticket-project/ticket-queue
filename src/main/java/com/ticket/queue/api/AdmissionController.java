@@ -1,5 +1,8 @@
 package com.ticket.queue.api;
 
+import com.ticket.queue.api.dto.EnterResponse;
+import com.ticket.queue.api.dto.JoinResponse;
+import com.ticket.queue.api.dto.PublicStateResponse;
 import com.ticket.queue.application.AdmissionService;
 import com.ticket.support.passport.Passport;
 import lombok.RequiredArgsConstructor;

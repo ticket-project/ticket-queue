@@ -46,8 +46,21 @@ public class SignedQueueTokenService implements QueueTokenService {
         validateTtl(ttl);
 
         Instant issuedAt = clock.instant();
-        Instant expiresAt = issuedAt.plus(ttl);
+        return buildToken(claims, issuedAt, issuedAt.plus(ttl));
+    }
 
+    @Override
+    public QueueTokenClaims verify(final String token) {
+        Claims claims = parse(token);
+        validateScope(claims);
+        return toQueueTokenClaims(claims);
+    }
+
+    private String buildToken(
+            final QueueTokenClaims claims,
+            final Instant issuedAt,
+            final Instant expiresAt
+    ) {
         return Jwts.builder()
                 .issuer(ISSUER)
                 .subject(claims.queueId())
@@ -60,11 +73,7 @@ public class SignedQueueTokenService implements QueueTokenService {
                 .compact();
     }
 
-    @Override
-    public QueueTokenClaims verify(final String token) {
-        Claims claims = parse(token);
-        validateScope(claims);
-
+    private QueueTokenClaims toQueueTokenClaims(final Claims claims) {
         return new QueueTokenClaims(
                 readLongClaim(claims, PERFORMANCE_ID_CLAIM),
                 claims.getSubject(),

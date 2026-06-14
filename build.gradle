@@ -29,7 +29,7 @@ repositories {
 dependencies {
     implementation 'com.ticket:ticket-common-passport:0.0.1-SNAPSHOT'
     implementation 'com.ticket:ticket-common-passport-web:0.0.1-SNAPSHOT'
-    implementation 'com.ticket:ticket-common-token:0.0.1-SNAPSHOT'
+    implementation 'com.ticket:ticket-common-security-token:0.0.1-SNAPSHOT'
 
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
