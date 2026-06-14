@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.Objects;
 import javax.crypto.SecretKey;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -30,6 +31,7 @@ public class SignedQueueTokenService implements QueueTokenService {
     private final Clock clock;
     private final SecretKey secretKey;
 
+    @Autowired
     public SignedQueueTokenService(final QueueProperties properties) {
         this(properties, Clock.systemUTC());
     }
