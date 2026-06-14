@@ -1,12 +1,22 @@
 name: Claude Code Review
 
 on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
   pull_request:
     branches: [ "master", "develop" ]
-    types: [opened, synchronize, ready_for_review, reopened]
+    types: [ready_for_review, reopened]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   claude-review:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -37,7 +47,7 @@ jobs:
             6. .github/instructions/java-review.instructions.md
 
             그 다음 공식 code-review 플러그인을 실행합니다.
-            /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
+            /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number || inputs.pr_number }}
 
             ## 리뷰 작성 규칙
             - 모든 출력은 한국어로 작성합니다.
