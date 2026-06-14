@@ -6,11 +6,18 @@ on:
   issues:
     types: [opened, assigned]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.issue.number || github.event.comment.id || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   claude:
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      github.event.sender.type != 'Bot' &&
+      (
+        (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
