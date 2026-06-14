@@ -12,6 +12,7 @@ import java.util.Date;
 import java.util.Objects;
 import java.util.UUID;
 import javax.crypto.SecretKey;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -25,6 +26,7 @@ public class SignedAdmissionTokenIssuer implements AdmissionTokenIssuer {
     private final Clock clock;
     private final SecretKey secretKey;
 
+    @Autowired
     public SignedAdmissionTokenIssuer(final AdmissionTokenProperties properties) {
         this(properties, Clock.systemUTC());
     }
