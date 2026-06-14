@@ -19,13 +19,10 @@ services:
       - path: .env
         required: false
     environment:
-      QUEUE_REDIS_HOST: redis
-      QUEUE_REDIS_PORT: 6379
-      QUEUE_PUBLIC_STATE_OUTPUT_DIRECTORY: /public-state
-      QUEUE_PUBLIC_STATE_PATH_TEMPLATE: queue-state/performances/{performanceId}.json
-      QUEUE_SCHEDULER_ENABLED: ${QUEUE_SCHEDULER_ENABLED:-true}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
     volumes:
-      - ./public-state:/public-state
+      - ./public-state:/app/build/public-state
     expose:
       - "8090"
 
