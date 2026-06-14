@@ -35,6 +35,8 @@ GitHub repository 또는 `azure-queue` environment에 아래 secret을 설정한
 ```text
 DOCKER_USERNAME
 DOCKER_PASSWORD
+TICKET_COMMON_READ_USER
+TICKET_COMMON_READ_TOKEN
 AZURE_VM_HOST
 AZURE_VM_USER
 AZURE_VM_SSH_KEY
@@ -43,7 +45,7 @@ AZURE_VM_PORT
 
 SSH가 22 포트를 쓰면 `AZURE_VM_PORT`는 생략할 수 있다.
 
-Gradle build는 GitHub Packages를 `GITHUB_ACTOR`, `GITHUB_TOKEN`으로 읽는다. `ticket-common` package가 private이면 이 repository에 package read 권한을 부여해야 한다.
+Gradle build는 GitHub Packages를 `GITHUB_PACKAGES_USER`, `GITHUB_PACKAGES_TOKEN`으로 읽는다. `ticket-common` package가 private이면 `ticket-queue` repository에 package read 권한을 부여하거나, `read:packages` 권한이 있는 token을 `TICKET_COMMON_READ_TOKEN`에 설정한다.
 
 Workflow는 `master` push에서 실행되고, GitHub Actions에서 수동 실행도 가능하다.
 
