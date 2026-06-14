@@ -1,0 +1,17 @@
+pluginManagement {
+    def springBootVersion = settings.hasProperty('springBootVersion') ? settings.springBootVersion : '4.0.2'
+    def springDependencyManagementVersion = settings.hasProperty('springDependencyManagementVersion') ? settings.springDependencyManagementVersion : '1.1.7'
+
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == 'org.springframework.boot') {
+                useVersion springBootVersion
+            }
+            if (requested.id.id == 'io.spring.dependency-management') {
+                useVersion springDependencyManagementVersion
+            }
+        }
+    }
+}
+
+rootProject.name = 'ticket-queue'
