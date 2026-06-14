@@ -55,6 +55,31 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Prepare deploy directory
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          port: ${{ secrets.AZURE_VM_PORT || '22' }}
+          script: |
+            set -e
+            sudo mkdir -p /opt/ticket-queue/nginx
+            sudo mkdir -p /opt/ticket-queue/public-state/queue-state/performances
+            sudo chown -R "$USER:$USER" /opt/ticket-queue
+
+      - name: Upload deploy files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          port: ${{ secrets.AZURE_VM_PORT || '22' }}
+          source: "deploy/docker-compose.yml,deploy/nginx/default.conf"
+          target: "/opt/ticket-queue"
+          strip_components: 1
+          overwrite: true
+
       - name: Deploy to Azure VM
         uses: appleboy/ssh-action@v1.2.0
         with:

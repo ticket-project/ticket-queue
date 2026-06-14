@@ -24,7 +24,7 @@ sudo chown -R "$USER:$USER" /opt/ticket-queue
 
 GitHub Actions가 root가 아닌 사용자로 SSH 접속한다면 해당 사용자는 passwordless sudo로 `docker`를 실행할 수 있어야 한다.
 
-`deploy/docker-compose.yml`은 VM의 `/opt/ticket-queue/docker-compose.yml`에, `deploy/nginx/default.conf`는 `/opt/ticket-queue/nginx/default.conf`에 둔다.
+GitHub Actions가 `deploy/docker-compose.yml`과 `deploy/nginx/default.conf`를 VM의 `/opt/ticket-queue` 아래로 업로드한다.
 
 `deploy/env.example`을 기준으로 VM에 `/opt/ticket-queue/.env`를 만들고 모든 secret 값을 교체한다. 실제 `.env`는 커밋하지 않는다.
 
