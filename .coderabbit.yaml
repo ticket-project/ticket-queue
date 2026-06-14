@@ -1,0 +1,119 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: ko-KR
+tone_instructions: >
+  모든 리뷰, 요약, 제안은 한국어로 작성하세요.
+  리뷰는 항상 심층적으로 수행하고, 패치만 보지 말고 주변 코드, 관련 테스트, 설정, 배포 파일까지 함께 확인하세요.
+  queue 서버의 대기열 상태 전이, Redis key/TTL, JWT/admission token 검증, public state 발행, 운영 설정 불일치 가능성을 우선 확인하세요.
+  근거가 약한 코멘트는 남기지 말고, 재현 조건이나 실패 시나리오가 분명한 문제를 중심으로 리뷰하세요.
+
+reviews:
+  profile: assertive
+  high_level_summary: true
+  high_level_summary_placeholder: "CodeRabbit PR 요약"
+  review_status: true
+  commit_status: true
+  changed_files_summary: true
+  sequence_diagrams: true
+  collapse_walkthrough: false
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+  suggested_labels: false
+  auto_apply_labels: false
+  suggested_reviewers: false
+  auto_assign_reviewers: false
+  in_progress_fortune: true
+  poem: false
+  enable_prompt_for_ai_agents: true
+  path_filters:
+    - "**/*"
+    - "!**/build/**"
+    - "!.gradle/**"
+    - "!.gradle-user-home/**"
+    - "!.tmp/**"
+    - "!.idea/**"
+    - "!.backup/**"
+  path_instructions:
+    - path: "src/main/java/**"
+      instructions: |
+        - 항상 한국어로 리뷰하세요.
+        - 대기열 상태 전이, Redis key 전략, TTL/만료 처리, scheduler 정합성, admission token 흐름을 우선 확인하세요.
+        - public state 발행, 파일 저장 경로, Redis Lua script 로딩, 운영 환경 변수 불일치 가능성을 함께 확인하세요.
+        - 단순 스타일보다 실제 장애 시나리오와 회귀 위험을 중심으로 지적하세요.
+    - path: "src/test/java/**"
+      instructions: |
+        - 항상 한국어로 리뷰하세요.
+        - Redis 상태 전이, token 검증, scheduler, public state 발행에 대한 회귀 테스트가 충분한지 확인하세요.
+    - path: ".github/**"
+      instructions: |
+        - 항상 한국어로 리뷰하세요.
+        - workflow, review 설정, 배포 설정 변경은 CI 실패, 보안 노출, 잘못된 자동화 동작을 중심으로 확인하세요.
+    - path: "deploy/**"
+      instructions: |
+        - 항상 한국어로 리뷰하세요.
+        - docker-compose, nginx, env 예시는 secret 노출, 잘못된 포트/볼륨, 운영 환경 변수 누락 가능성을 중심으로 확인하세요.
+    - path: "**/*"
+      instructions: |
+        - 항상 한국어로 리뷰하세요.
+        - 패치만 보지 말고 주변 코드와 관련 테스트까지 확인하세요.
+        - 버그, 보안, 동시성, 회귀 위험, 테스트 공백을 우선 지적하세요.
+  tools:
+    gitleaks:
+      enabled: true
+    sqlfluff:
+      enabled: true
+    checkov:
+      enabled: true
+    yamllint:
+      enabled: true
+    languagetool:
+      enabled: true
+      level: picky
+  auto_review:
+    enabled: true
+    drafts: true
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 0
+    ignore_title_keywords:
+      - "WIP"
+      - "[WIP]"
+      - "[skip ai]"
+      - "[skip review]"
+    base_branches:
+      - "master"
+      - "develop"
+  finishing_touches:
+    docstrings:
+      enabled: true
+    unit_tests:
+      enabled: true
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  web_search:
+    enabled: true
+  learnings:
+    scope: auto
+  issues:
+    scope: local
+  pull_requests:
+    scope: local
+
+code_generation:
+  docstrings:
+    language: ko-KR
+    path_instructions:
+      - path: "**/*"
+        instructions: |
+          - 문서와 기본 설명은 한국어로 작성하세요.
+          - JavaDoc은 목적, 파라미터, 반환값, 예외를 명확히 적으세요.
+  unit_tests:
+    path_instructions:
+      - path: "**/*"
+        instructions: |
+          - 새 분기나 회귀 위험이 있는 변경에는 테스트 제안을 적극적으로 포함하세요.
+          - Controller는 통합 또는 슬라이스 테스트, 나머지는 단위 테스트를 우선 고려하세요.
