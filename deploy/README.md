@@ -3,8 +3,7 @@
 이 배포 구성은 GitHub Actions에서 `ticket-queue` Docker 이미지를 Docker Hub에 push하고, Azure VM에서는 이미지를 pull한 뒤 Docker Compose로 재기동한다.
 
 ```text
-client or Cloudflare -> nginx -> ticket-queue -> Redis
-                    \-> /queue-state/** static JSON
+client or Cloudflare -> nginx cached /api/v1/queue/**/state -> ticket-queue -> Redis
 ```
 
 ## VM Setup
@@ -18,7 +17,7 @@ sudo apt update
 sudo apt install -y docker.io docker-compose-plugin
 sudo systemctl enable docker
 sudo systemctl start docker
-sudo mkdir -p /opt/ticket-queue/nginx /opt/ticket-queue/public-state/queue-state/performances
+sudo mkdir -p /opt/ticket-queue/nginx
 sudo chown -R "$USER:$USER" /opt/ticket-queue
 ```
 
@@ -68,7 +67,8 @@ master push
 ```bash
 cd /opt/ticket-queue
 sudo docker compose ps
-curl -I http://localhost/queue-state/performances/1.json
+curl -I http://localhost/api/v1/queue/performances/1/state
+curl -I https://queue.oneticket.site/api/v1/queue/performances/1/state
 ```
 
 public state 응답은 아래 헤더를 포함해야 한다.

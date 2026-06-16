@@ -25,7 +25,7 @@
 
 패키지 경계는 다음과 같이 유지한다.
 
-- `com.ticket.queue.api`: enter/status HTTP API와 응답 DTO
+- `com.ticket.queue.api`: join/state/enter HTTP API와 응답 DTO
 - `com.ticket.queue.application`: use case, status 조회, scheduler, admission 응답 조립
 - `com.ticket.queue.config`: app.queue와 admission token 설정
 - `com.ticket.queue.domain`: queue model과 port
@@ -39,8 +39,9 @@ Queue Server는 Ticket Server의 좌석 선택, hold, 주문, refresh token Redi
 - queue session 만료는 queue entry 만료와 동일하지 않다.
 - admission token secret, issuer, audience는 Ticket Server 설정과 일치해야 한다.
 - `activeTtl`은 active member TTL이자 Ticket Server 예매 API 사용 가능 TTL이다.
-- Queue Server의 enter/status는 access token을 검증하지 않는다. status polling은 `X-Queue-Session` 기반이다.
-- active 응답 이후 클라이언트는 Queue Server polling을 중지하고 Ticket Server 예매 흐름으로 이동한다.
+- Queue Server의 `state`는 공개 API라 access token/header를 요구하지 않고, `enter`는 `X-Queue-Token`만 검증한다.
+- `/state` polling은 Cloudflare/nginx 캐시 경유를 전제로 하며, `join`/`enter`는 캐시하지 않는다.
+- `enter`에서 active 응답을 받은 뒤 클라이언트는 Ticket Server 예매 흐름으로 이동한다.
 - Redis Cluster 운영을 고려해 key naming과 자료구조 변경은 신중하게 검토한다.
 
 ## 검증
