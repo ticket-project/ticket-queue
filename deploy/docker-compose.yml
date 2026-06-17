@@ -15,14 +15,30 @@ services:
     restart: unless-stopped
     depends_on:
       - redis
+      - datadog-agent
     env_file:
       - path: .env
         required: false
     environment:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      JAVA_TOOL_OPTIONS: -javaagent:/opt/datadog/dd-java-agent.jar
+      DD_AGENT_HOST: datadog-agent
+      DD_SERVICE: ticket-queue
+      DD_ENV: prod
+      DD_VERSION: ${DD_VERSION:-latest}
+      DD_LOGS_INJECTION: "true"
+      DD_RUNTIME_METRICS_ENABLED: "true"
     expose:
       - "8090"
+    labels:
+      com.datadoghq.tags.service: ticket-queue
+      com.datadoghq.tags.env: prod
+      com.datadoghq.tags.version: ${DD_VERSION:-latest}
+      com.datadoghq.ad.logs: >-
+        [{"source":"java","service":"ticket-queue"}]
+      com.datadoghq.ad.checks: >-
+        {"openmetrics":{"init_config":{},"instances":[{"openmetrics_endpoint":"http://%%host%%:8090/actuator/prometheus","namespace":"ticket_queue","metrics":[".*"]}]}}
 
   nginx:
     image: nginx:1.27-alpine
@@ -34,6 +50,30 @@ services:
       - "80:80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:latest
+    container_name: datadog-agent
+    restart: unless-stopped
+    pid: host
+    cgroup: host
+    environment:
+      DD_API_KEY: ${DD_API_KEY:?DD_API_KEY is required}
+      DD_SITE: us5.datadoghq.com
+      DD_APM_ENABLED: "true"
+      DD_APM_NON_LOCAL_TRAFFIC: "true"
+      DD_LOGS_ENABLED: "true"
+      DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "true"
+      DD_LOGS_CONFIG_DOCKER_CONTAINER_USE_FILE: "true"
+      DD_PROCESS_AGENT_ENABLED: "true"
+      DD_CONTAINER_EXCLUDE_LOGS: name:datadog-agent
+      DD_ENV: prod
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /proc:/host/proc:ro
+      - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
+      - /opt/datadog-agent/run:/opt/datadog-agent/run:rw
 
 volumes:
   redis-data:
