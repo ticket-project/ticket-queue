@@ -1,15 +1,14 @@
 # Queue Azure VM Deployment
 
-이 배포 구성은 GitHub Actions에서 `ticket-queue` Docker 이미지를 Docker Hub에 push하고, Azure VM에서는 이미지를 pull한 뒤 Docker Compose로 재기동한다.
+`ticket-queue`는 GitHub Actions에서 Docker 이미지를 빌드하고 Docker Hub에 push한 뒤, Azure VM에서 이미지를 pull해 Docker Compose로 재기동한다.
 
 ```text
 client or Cloudflare -> nginx -> ticket-queue -> Redis
-                    \-> /queue-state/** static JSON
 ```
 
 ## VM Setup
 
-OS에 설치된 Nginx가 있으면 Docker Nginx와 80 포트가 충돌하므로 중지한다.
+VM에 Docker와 Compose plugin을 설치하고 배포 디렉터리를 만든다.
 
 ```bash
 sudo systemctl stop nginx || true
@@ -18,15 +17,29 @@ sudo apt update
 sudo apt install -y docker.io docker-compose-plugin
 sudo systemctl enable docker
 sudo systemctl start docker
-sudo mkdir -p /opt/ticket-queue/nginx /opt/ticket-queue/public-state/queue-state/performances
+sudo mkdir -p /opt/ticket-queue/nginx
 sudo chown -R "$USER:$USER" /opt/ticket-queue
 ```
 
 GitHub Actions가 root가 아닌 사용자로 SSH 접속한다면 해당 사용자는 passwordless sudo로 `docker`를 실행할 수 있어야 한다.
 
-GitHub Actions가 `deploy/docker-compose.yml`과 `deploy/nginx/default.conf`를 VM의 `/opt/ticket-queue` 아래로 업로드한다.
+## Server-Owned Compose
 
-`deploy/env.example`을 기준으로 VM에 `/opt/ticket-queue/.env`를 만들고 모든 secret 값을 교체한다. 실제 `.env`는 커밋하지 않는다.
+운영 `docker-compose.yml`은 VM의 `/opt/ticket-queue/docker-compose.yml`에서 직접 관리한다. GitHub Actions는 이 파일을 업로드하거나 덮어쓰지 않는다.
+
+GitHub Actions가 업로드하는 파일은 아래 하나뿐이다.
+
+```text
+deploy/nginx/default.conf -> /opt/ticket-queue/nginx/default.conf
+```
+
+따라서 Datadog Agent, `DD_API_KEY`, `DD_SITE`, `JAVA_TOOL_OPTIONS` 같은 운영 인프라 설정은 VM의 `/opt/ticket-queue/docker-compose.yml`에 직접 반영한다.
+
+## Environment
+
+`deploy/env.example`을 기준으로 VM에 `/opt/ticket-queue/.env`를 만들고 애플리케이션 secret 값을 교체한다. 실제 `.env`는 커밋하지 않는다.
+
+Datadog 설정은 core 서버와 동일하게 운영 `docker-compose.yml`에서 직접 관리한다.
 
 ## GitHub Secrets
 
@@ -58,7 +71,7 @@ master push
 -> docker push {DOCKER_USERNAME}/ticket-queue:latest
 -> ssh Azure VM
 -> docker pull
--> docker compose up -d --remove-orphans
+-> VM의 /opt/ticket-queue/docker-compose.yml로 docker compose up -d --remove-orphans
 ```
 
 ## Verify
@@ -68,7 +81,8 @@ master push
 ```bash
 cd /opt/ticket-queue
 sudo docker compose ps
-curl -I http://localhost/queue-state/performances/1.json
+curl -I http://localhost/api/v1/queue/performances/1/state
+curl -I https://queue.oneticket.site/api/v1/queue/performances/1/state
 ```
 
 public state 응답은 아래 헤더를 포함해야 한다.
