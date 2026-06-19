@@ -1,6 +1,6 @@
 # ticket-queue 군더더기 복잡도 제거 설계
 
-> 보관 문서: 이 문서는 2026-06-06 당시 이전 queue 구현을 기준으로 한 리팩터링 기록입니다. 현재 Queue Server API와 public state 캐시 구조는 [README.md](../../../README.md)와 [cloudflare-cached-state.md](../../cloudflare-cached-state.md)를 기준으로 봅니다.
+> 보관 문서: 이 문서는 2026-06-06 당시 이전 queue 구현을 기준으로 한 리팩터링 기록입니다. 현재 Queue Server API와 public state 캐시 구조는 [README.md](../../../README.md)와 [cloudflare-state-api-cache.md](../../cloudflare-state-api-cache.md)를 기준으로 봅니다.
 
 | 항목 | 내용 |
 |---|---|
