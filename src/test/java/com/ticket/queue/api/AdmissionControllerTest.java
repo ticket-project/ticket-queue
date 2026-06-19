@@ -37,7 +37,7 @@ class AdmissionControllerTest {
         internalAuthVerifier = mock(PassportVerifier.class);
         mockMvc = MockMvcBuilders.standaloneSetup(new AdmissionController(admissionService))
                 .setCustomArgumentResolvers(new PassportArgumentResolver())
-                .addFilters(new PassportAuthenticationFilter(internalAuthVerifier))
+                .addFilters(new PassportAuthenticationFilter(internalAuthVerifier, INTERNAL_AUTH_HEADER))
                 .build();
     }
 
