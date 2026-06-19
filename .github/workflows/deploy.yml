@@ -65,7 +65,6 @@ jobs:
           script: |
             set -e
             sudo mkdir -p /opt/ticket-queue/nginx
-            sudo mkdir -p /opt/ticket-queue/public-state/queue-state/performances
             sudo chown -R "$USER:$USER" /opt/ticket-queue
 
       - name: Upload nginx config
@@ -93,7 +92,6 @@ jobs:
             DEPLOY_DIR="/opt/ticket-queue"
 
             cd "$DEPLOY_DIR"
-            mkdir -p public-state/queue-state/performances
             test -f .env
             test -f docker-compose.yml
             echo "${{ secrets.DOCKER_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
