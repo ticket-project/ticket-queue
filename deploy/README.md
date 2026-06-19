@@ -85,10 +85,17 @@ curl -I http://localhost/api/v1/queue/performances/1/state
 curl -I https://queue.oneticket.site/api/v1/queue/performances/1/state
 ```
 
-public state 응답은 아래 헤더를 포함해야 한다.
+origin 응답은 아래 헤더를 포함해야 한다.
 
 ```text
-Cache-Control: public, max-age=1, s-maxage=1, stale-while-revalidate=5
+Cache-Control: no-store
+X-Content-Type-Options: nosniff
+```
+
+Cloudflare Cache Rule은 `/api/v1/queue/performances/*/state` GET 요청만 cache eligible로 두고, Edge TTL은 Cloudflare 설정에서 강제한다. 반복 요청에서 아래 값이 보이면 Cloudflare edge cache가 적용된 것이다.
+
+```text
+cf-cache-status: HIT
 ```
 
 Azure network security group은 `22`, `80`, 나중에 `443`만 연다. Redis `6379`와 queue `8090`은 직접 외부에 열지 않는다.
