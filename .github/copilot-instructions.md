@@ -6,7 +6,7 @@
 
 1. `AGENTS.md`
 2. `README.md`
-3. `docs/cloudflare-static-state.md`
+3. `docs/cloudflare-state-api-cache.md`
 4. `docs/superpowers/specs/2026-06-06-queue-simplification-design.md`
 5. `build.gradle`, `settings.gradle`, 테스트 코드
 
@@ -21,8 +21,8 @@
 
 - 대기열 상태 전이와 admission token 발급/검증
 - Redis key naming, TTL, 만료 처리, Lua script 로딩
-- scheduler, admission advance, public state 발행 흐름
-- Cloudflare static state, nginx, docker-compose, 운영 환경 변수
+- scheduler, admission advance, public state API 조회 흐름
+- Cloudflare state API cache, nginx, docker-compose, 운영 환경 변수
 - 공개 API와 내부 인증 경계
 
 ## 권장 검증
