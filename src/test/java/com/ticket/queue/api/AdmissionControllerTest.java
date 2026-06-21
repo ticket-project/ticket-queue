@@ -13,43 +13,43 @@ import com.ticket.queue.api.dto.EnterResponse;
 import com.ticket.queue.api.dto.JoinResponse;
 import com.ticket.queue.api.dto.PublicStateResponse;
 import com.ticket.queue.application.AdmissionService;
-import com.ticket.support.passport.Passport;
-import com.ticket.support.passport.web.PassportArgumentResolver;
-import com.ticket.support.passport.web.PassportAuthenticationFilter;
-import com.ticket.support.passport.web.PassportVerifier;
+import com.ticket.queue.config.AccessTokenAuthenticationFilter;
+import com.ticket.queue.config.AccessTokenVerifier;
+import com.ticket.queue.config.AuthenticatedMember;
+import com.ticket.queue.config.AuthenticatedMemberArgumentResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class AdmissionControllerTest {
 
-    private static final String INTERNAL_AUTH_HEADER = "X-Internal-Auth";
     private static final String QUEUE_TOKEN_HEADER = "X-Queue-Token";
 
     private AdmissionService admissionService;
-    private PassportVerifier internalAuthVerifier;
+    private AccessTokenVerifier accessTokenVerifier;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         admissionService = mock(AdmissionService.class);
-        internalAuthVerifier = mock(PassportVerifier.class);
+        accessTokenVerifier = mock(AccessTokenVerifier.class);
         mockMvc = MockMvcBuilders.standaloneSetup(new AdmissionController(admissionService))
-                .setCustomArgumentResolvers(new PassportArgumentResolver())
-                .addFilters(new PassportAuthenticationFilter(internalAuthVerifier))
+                .setCustomArgumentResolvers(new AuthenticatedMemberArgumentResolver())
+                .addFilters(new AccessTokenAuthenticationFilter(accessTokenVerifier))
                 .build();
     }
 
     @Test
-    void join_uses_internal_auth_passport_and_returns_queue_token() throws Exception {
-        Passport passport = new Passport(10L, "MEMBER");
-        when(internalAuthVerifier.verify("Bearer internal-token")).thenReturn(passport);
-        when(admissionService.join(1L, passport))
+    void join_uses_access_token_member_and_returns_queue_token() throws Exception {
+        AuthenticatedMember member = new AuthenticatedMember(10L, "MEMBER");
+        when(accessTokenVerifier.verify("Bearer access-token")).thenReturn(member);
+        when(admissionService.join(1L, member))
                 .thenReturn(new JoinResponse(1L, "queue-1", 42L, "WAITING", "queue-token"));
 
         mockMvc.perform(post("/api/v1/queue/performances/{performanceId}/join", 1L)
-                        .header(INTERNAL_AUTH_HEADER, "Bearer internal-token"))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.performanceId").value(1))
                 .andExpect(jsonPath("$.queueId").value("queue-1"))
@@ -57,16 +57,16 @@ class AdmissionControllerTest {
                 .andExpect(jsonPath("$.status").value("WAITING"))
                 .andExpect(jsonPath("$.queueToken").value("queue-token"));
 
-        verify(internalAuthVerifier).verify("Bearer internal-token");
-        verify(admissionService).join(1L, passport);
+        verify(accessTokenVerifier).verify("Bearer access-token");
+        verify(admissionService).join(1L, member);
     }
 
     @Test
-    void join_without_internal_auth_returns_401() throws Exception {
+    void join_without_access_token_returns_401() throws Exception {
         mockMvc.perform(post("/api/v1/queue/performances/{performanceId}/join", 1L))
                 .andExpect(status().isUnauthorized());
 
-        verifyNoInteractions(internalAuthVerifier);
+        verifyNoInteractions(accessTokenVerifier);
         verifyNoInteractions(admissionService);
     }
 
@@ -91,7 +91,7 @@ class AdmissionControllerTest {
                 .andExpect(jsonPath("$.refreshAfterMs").value(5000))
                 .andExpect(jsonPath("$.serverTimeMillis").value(1_717_000_000_000L));
 
-        verifyNoInteractions(internalAuthVerifier);
+        verifyNoInteractions(accessTokenVerifier);
         verify(admissionService).state(1L);
     }
 
@@ -113,7 +113,7 @@ class AdmissionControllerTest {
                 .andExpect(jsonPath("$.expiresAtMillis").value(1_717_000_900_000L))
                 .andExpect(jsonPath("$.redirectUrl").value("/booking/seat?performanceId=1"));
 
-        verifyNoInteractions(internalAuthVerifier);
+        verifyNoInteractions(accessTokenVerifier);
         verify(admissionService).enter(1L, "queue-token");
     }
 

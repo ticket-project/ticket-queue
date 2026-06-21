@@ -29,9 +29,6 @@ jobs:
           cache: gradle
 
       - name: Test and build bootJar
-        env:
-          GITHUB_PACKAGES_USER: ${{ secrets.TICKET_COMMON_READ_USER || github.actor }}
-          GITHUB_PACKAGES_TOKEN: ${{ secrets.TICKET_COMMON_READ_TOKEN || github.token }}
         run: |
           chmod +x ./gradlew
           ./gradlew test bootJar
@@ -65,17 +62,16 @@ jobs:
           script: |
             set -e
             sudo mkdir -p /opt/ticket-queue/nginx
-            sudo mkdir -p /opt/ticket-queue/public-state/queue-state/performances
             sudo chown -R "$USER:$USER" /opt/ticket-queue
 
-      - name: Upload deploy files
+      - name: Upload nginx config
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.AZURE_VM_HOST }}
           username: ${{ secrets.AZURE_VM_USER }}
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           port: ${{ secrets.AZURE_VM_PORT || '22' }}
-          source: "deploy/docker-compose.yml,deploy/nginx/default.conf"
+          source: "deploy/nginx/default.conf"
           target: "/opt/ticket-queue"
           strip_components: 1
           overwrite: true
@@ -93,7 +89,6 @@ jobs:
             DEPLOY_DIR="/opt/ticket-queue"
 
             cd "$DEPLOY_DIR"
-            mkdir -p public-state/queue-state/performances
             test -f .env
             test -f docker-compose.yml
             echo "${{ secrets.DOCKER_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin

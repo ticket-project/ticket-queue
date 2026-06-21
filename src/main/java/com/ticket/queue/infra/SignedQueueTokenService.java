@@ -24,6 +24,7 @@ public class SignedQueueTokenService implements QueueTokenService {
 
     private static final String PERFORMANCE_ID_CLAIM = "performanceId";
     private static final String SEQ_CLAIM = "seq";
+    private static final String MEMBER_ID_CLAIM = "memberId";
     private static final String SCOPE_CLAIM = "scope";
     private static final String SCOPE = "queue-entry";
     private static final String ISSUER = "ticket-queue";
@@ -68,6 +69,7 @@ public class SignedQueueTokenService implements QueueTokenService {
                 .subject(claims.queueId())
                 .claim(PERFORMANCE_ID_CLAIM, claims.performanceId())
                 .claim(SEQ_CLAIM, claims.seq())
+                .claim(MEMBER_ID_CLAIM, claims.memberId())
                 .claim(SCOPE_CLAIM, SCOPE)
                 .issuedAt(Date.from(issuedAt))
                 .expiration(Date.from(expiresAt))
@@ -79,7 +81,8 @@ public class SignedQueueTokenService implements QueueTokenService {
         return new QueueTokenClaims(
                 readLongClaim(claims, PERFORMANCE_ID_CLAIM),
                 claims.getSubject(),
-                readLongClaim(claims, SEQ_CLAIM)
+                readLongClaim(claims, SEQ_CLAIM),
+                readLongClaim(claims, MEMBER_ID_CLAIM)
         );
     }
 
@@ -143,6 +146,7 @@ public class SignedQueueTokenService implements QueueTokenService {
         validatePositive(claims.performanceId(), "performanceId");
         validateNotBlank(claims.queueId(), "queueId");
         validatePositive(claims.seq(), "seq");
+        validatePositive(claims.memberId(), "memberId");
     }
 
     private void validateTtl(final Duration ttl) {

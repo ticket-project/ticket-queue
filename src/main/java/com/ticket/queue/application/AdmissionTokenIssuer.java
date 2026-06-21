@@ -4,5 +4,5 @@ import java.time.Duration;
 
 public interface AdmissionTokenIssuer {
 
-    String issue(Long performanceId, String queueId, Duration ttl);
+    String issue(Long memberId, Long performanceId, String queueId, Duration ttl);
 }
