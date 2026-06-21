@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.ticket.queue.api.dto.EnterResponse;
 import com.ticket.queue.api.dto.JoinResponse;
 import com.ticket.queue.api.dto.PublicStateResponse;
+import com.ticket.queue.config.AuthenticatedMember;
 import com.ticket.queue.config.QueueProperties;
 import com.ticket.queue.config.RedirectProperties;
 import com.ticket.queue.domain.AdmissionStateStore;
@@ -18,7 +19,6 @@ import com.ticket.queue.domain.EnterResult;
 import com.ticket.queue.domain.JoinResult;
 import com.ticket.queue.domain.PublicState;
 import com.ticket.queue.domain.UuidSupplier;
-import com.ticket.support.passport.Passport;
 import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,15 +66,15 @@ class AdmissionServiceTest {
 
     @Test
     void join_issues_sequence_and_queue_token() {
-        Passport passport = new Passport(10L, "MEMBER");
+        AuthenticatedMember member = new AuthenticatedMember(10L, "MEMBER");
         UUID queueUuid = UUID.fromString("00000000-0000-0000-0000-000000000001");
         when(uuidSupplier.get()).thenReturn(queueUuid);
         when(admissionStateStore.joinQueue(eq(1L), anyString(), eq(queueUuid.toString()), eq(Duration.ofHours(24)), eq(5_000L)))
                 .thenReturn(new JoinResult(1L, queueUuid.toString(), 42L, true));
-        when(queueTokenService.issue(new QueueTokenClaims(1L, queueUuid.toString(), 42L), Duration.ofHours(24)))
+        when(queueTokenService.issue(new QueueTokenClaims(1L, queueUuid.toString(), 42L, 10L), Duration.ofHours(24)))
                 .thenReturn("queue-token");
 
-        JoinResponse response = service.join(1L, passport);
+        JoinResponse response = service.join(1L, member);
 
         assertThat(response.performanceId()).isEqualTo(1L);
         assertThat(response.queueId()).isEqualTo(queueUuid.toString());
@@ -101,8 +101,8 @@ class AdmissionServiceTest {
     @Test
     void enter_rejects_when_sequence_is_not_admitted_yet() {
         when(queueTokenService.verify("queue-token"))
-                .thenReturn(new QueueTokenClaims(1L, "queue-1", 101L));
-        when(admissionTokenIssuer.issue(1L, "queue-1", Duration.ofMinutes(15)))
+                .thenReturn(new QueueTokenClaims(1L, "queue-1", 101L, 10L));
+        when(admissionTokenIssuer.issue(10L, 1L, "queue-1", Duration.ofMinutes(15)))
                 .thenReturn("candidate-admission-token");
         when(admissionStateStore.enterQueue(
                 1L,
@@ -121,8 +121,8 @@ class AdmissionServiceTest {
     @Test
     void enter_returns_admission_token_when_sequence_is_admitted() {
         when(queueTokenService.verify("queue-token"))
-                .thenReturn(new QueueTokenClaims(1L, "queue-1", 100L));
-        when(admissionTokenIssuer.issue(1L, "queue-1", Duration.ofMinutes(15)))
+                .thenReturn(new QueueTokenClaims(1L, "queue-1", 100L, 10L));
+        when(admissionTokenIssuer.issue(10L, 1L, "queue-1", Duration.ofMinutes(15)))
                 .thenReturn("candidate-admission-token");
         when(admissionStateStore.enterQueue(
                 1L,
@@ -144,8 +144,8 @@ class AdmissionServiceTest {
     @Test
     void enter_is_idempotent_for_same_queue_id() {
         when(queueTokenService.verify("queue-token"))
-                .thenReturn(new QueueTokenClaims(1L, "queue-1", 100L));
-        when(admissionTokenIssuer.issue(1L, "queue-1", Duration.ofMinutes(15)))
+                .thenReturn(new QueueTokenClaims(1L, "queue-1", 100L, 10L));
+        when(admissionTokenIssuer.issue(10L, 1L, "queue-1", Duration.ofMinutes(15)))
                 .thenReturn("candidate-admission-token");
         when(admissionStateStore.enterQueue(
                 1L,
@@ -164,8 +164,8 @@ class AdmissionServiceTest {
     @Test
     void enter_returns_429_when_active_sessions_are_full() {
         when(queueTokenService.verify("queue-token"))
-                .thenReturn(new QueueTokenClaims(1L, "queue-1", 100L));
-        when(admissionTokenIssuer.issue(1L, "queue-1", Duration.ofMinutes(15)))
+                .thenReturn(new QueueTokenClaims(1L, "queue-1", 100L, 10L));
+        when(admissionTokenIssuer.issue(10L, 1L, "queue-1", Duration.ofMinutes(15)))
                 .thenReturn("candidate-admission-token");
         when(admissionStateStore.enterQueue(
                 1L,
@@ -189,7 +189,7 @@ class AdmissionServiceTest {
                 .isThrownBy(() -> service.enter(1L, "bad-token"))
                 .satisfies(exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED));
 
-        verify(admissionTokenIssuer, never()).issue(1L, "queue-1", Duration.ofMinutes(15));
+        verify(admissionTokenIssuer, never()).issue(10L, 1L, "queue-1", Duration.ofMinutes(15));
         verify(admissionStateStore, never()).enterQueue(
                 eq(1L),
                 eq("queue-1"),

@@ -29,9 +29,6 @@ jobs:
           cache: gradle
 
       - name: Test and build bootJar
-        env:
-          GITHUB_PACKAGES_USER: ${{ secrets.TICKET_COMMON_READ_USER || github.actor }}
-          GITHUB_PACKAGES_TOKEN: ${{ secrets.TICKET_COMMON_READ_TOKEN || github.token }}
         run: |
           chmod +x ./gradlew
           ./gradlew test bootJar

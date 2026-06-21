@@ -4,7 +4,7 @@ import com.ticket.queue.api.dto.EnterResponse;
 import com.ticket.queue.api.dto.JoinResponse;
 import com.ticket.queue.api.dto.PublicStateResponse;
 import com.ticket.queue.application.AdmissionService;
-import com.ticket.support.passport.Passport;
+import com.ticket.queue.config.AuthenticatedMember;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,9 +26,9 @@ public class AdmissionController {
     @PostMapping("/{performanceId}/join")
     public ResponseEntity<JoinResponse> join(
             @PathVariable final Long performanceId,
-            final Passport passport
+            final AuthenticatedMember member
     ) {
-        return ResponseEntity.ok(admissionService.join(performanceId, passport));
+        return ResponseEntity.ok(admissionService.join(performanceId, member));
     }
 
     @GetMapping("/{performanceId}/state")

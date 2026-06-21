@@ -5,12 +5,12 @@ import com.ticket.queue.api.dto.JoinResponse;
 import com.ticket.queue.api.dto.PublicStateResponse;
 import com.ticket.queue.config.QueueProperties;
 import com.ticket.queue.config.RedirectProperties;
+import com.ticket.queue.config.AuthenticatedMember;
 import com.ticket.queue.domain.AdmissionStateStore;
 import com.ticket.queue.domain.EnterResult;
 import com.ticket.queue.domain.JoinResult;
 import com.ticket.queue.domain.PublicState;
 import com.ticket.queue.domain.UuidSupplier;
-import com.ticket.support.passport.Passport;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -31,9 +31,9 @@ public class AdmissionService {
     private final QueueProperties queueProperties;
     private final UuidSupplier uuidSupplier;
 
-    public JoinResponse join(final Long performanceId, final Passport passport) {
-        JoinResult join = joinState(performanceId, passport);
-        String queueToken = issueQueueToken(performanceId, join);
+    public JoinResponse join(final Long performanceId, final AuthenticatedMember member) {
+        JoinResult join = joinState(performanceId, member);
+        String queueToken = issueQueueToken(performanceId, join, member);
 
         return JoinResponse.waiting(performanceId, join, queueToken);
     }
@@ -63,11 +63,11 @@ public class AdmissionService {
 
     private JoinResult joinState(
             final Long performanceId,
-            final Passport passport
+            final AuthenticatedMember member
     ) {
         return admissionStateStore.joinQueue(
                 performanceId,
-                userIdHash(passport),
+                userIdHash(member),
                 uuidSupplier.get().toString(),
                 queueProperties.getDefaultQueueTtl(),
                 queueProperties.getDefaultRefreshAfterMs()
@@ -76,10 +76,11 @@ public class AdmissionService {
 
     private String issueQueueToken(
             final Long performanceId,
-            final JoinResult join
+            final JoinResult join,
+            final AuthenticatedMember member
     ) {
         return queueTokenService.issue(
-                new QueueTokenClaims(performanceId, join.queueId(), join.seq()),
+                new QueueTokenClaims(performanceId, join.queueId(), join.seq(), member.memberId()),
                 queueProperties.getDefaultQueueTtl()
         );
     }
@@ -105,6 +106,7 @@ public class AdmissionService {
             final QueueTokenClaims claims
     ) {
         return admissionTokenIssuer.issue(
+                claims.memberId(),
                 performanceId,
                 claims.queueId(),
                 queueProperties.getShoppingSessionTtl()
@@ -134,13 +136,13 @@ public class AdmissionService {
         }
     }
 
-    private String userIdHash(final Passport passport) {
-        if (passport == null || passport.memberId() == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authenticated passport is required");
+    private String userIdHash(final AuthenticatedMember member) {
+        if (member == null || member.memberId() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authenticated member is required");
         }
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hashed = digest.digest(String.valueOf(passport.memberId()).getBytes(StandardCharsets.UTF_8));
+            byte[] hashed = digest.digest(String.valueOf(member.memberId()).getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hashed);
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is not available", exception);

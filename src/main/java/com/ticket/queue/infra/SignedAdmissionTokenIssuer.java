@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 public class SignedAdmissionTokenIssuer implements AdmissionTokenIssuer {
 
     private static final String PERFORMANCE_ID_CLAIM = "performanceId";
+    private static final String QUEUE_ID_CLAIM = "queueId";
     private static final String SCOPE_CLAIM = "scope";
     private static final String SCOPE = "ticket-admission";
 
@@ -39,16 +40,18 @@ public class SignedAdmissionTokenIssuer implements AdmissionTokenIssuer {
     }
 
     @Override
-    public String issue(final Long performanceId, final String queueId, final Duration ttl) {
+    public String issue(final Long memberId, final Long performanceId, final String queueId, final Duration ttl) {
+        validatePositive(memberId, "memberId");
         validatePositive(performanceId, "performanceId");
         validateNotBlank(queueId, "queueId");
         validateTtl(ttl);
 
         Instant issuedAt = clock.instant();
-        return buildToken(performanceId, queueId, issuedAt, issuedAt.plus(ttl));
+        return buildToken(memberId, performanceId, queueId, issuedAt, issuedAt.plus(ttl));
     }
 
     private String buildToken(
+            final Long memberId,
             final Long performanceId,
             final String queueId,
             final Instant issuedAt,
@@ -59,8 +62,9 @@ public class SignedAdmissionTokenIssuer implements AdmissionTokenIssuer {
                 .audience()
                 .add(properties.getAudience())
                 .and()
-                .subject(queueId)
+                .subject(String.valueOf(memberId))
                 .claim(PERFORMANCE_ID_CLAIM, performanceId)
+                .claim(QUEUE_ID_CLAIM, queueId)
                 .claim(SCOPE_CLAIM, SCOPE)
                 .issuedAt(Date.from(issuedAt))
                 .expiration(Date.from(expiresAt))

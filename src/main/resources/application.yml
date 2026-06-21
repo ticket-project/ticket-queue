@@ -16,10 +16,10 @@ management:
         enabled: true
 
 security:
-  internal-auth:
-    issuer: ticket-gateway
-    audience: ticket-queue
-    secret-key: ${INTERNAL_AUTH_SECRET_KEY}
+  jwt:
+    issuer: ${JWT_ISSUER:ticket}
+    secret-key: ${JWT_SECRET}
+    access-token-expiration-seconds: ${JWT_ACCESS_TOKEN_EXPIRATION_SECONDS:1800}
   admission:
     secret-key: ${ADMISSION_TOKEN_SECRET_KEY}
 
