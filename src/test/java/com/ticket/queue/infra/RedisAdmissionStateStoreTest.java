@@ -39,7 +39,8 @@ class RedisAdmissionStateStoreTest {
                 .doesNotContain("XADD")
                 .doesNotContain("'HSET'");
         assertThat(script).contains("redis.call('SET', KEYS[3], ticket_value, 'PX', ttl_millis)");
-        assertThat(script).contains("redis.call('SET', KEYS[4], '1', 'PX', ttl_millis, 'NX')");
+        assertThat(script).contains("local marker_ttl_millis = tonumber(ARGV[4])");
+        assertThat(script).contains("redis.call('SET', KEYS[4], '1', 'PX', marker_ttl_millis, 'NX')");
     }
 
     @Test
@@ -117,7 +118,7 @@ class RedisAdmissionStateStoreTest {
                         RedisKey.publicWaitingMarker(1L)
                 );
         assertThat(argsCaptor.getValue())
-                .containsExactly("queue-1", "user-hash", 86_400_000L);
+                .containsExactly("queue-1", "user-hash", 86_400_000L, 10_000L);
         verify(waitingPerformanceSet).add("1");
     }
 
