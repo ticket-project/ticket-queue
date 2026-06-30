@@ -33,6 +33,7 @@ import org.springframework.stereotype.Repository;
 public class RedisAdmissionStateStore implements AdmissionStateStore {
 
     private static final long ADVANCE_LOCK_LEASE_MILLIS = 5_000L;
+    private static final long WAITING_MARKER_TTL_MILLIS = 10_000L;
     private static final String JOIN_QUEUE_SCRIPT = load("redis/join_queue.lua");
     private static final String ENTER_QUEUE_SCRIPT = load("redis/enter_queue.lua");
     private static final String ADVANCE_QUEUE_STATE_SCRIPT = load("redis/advance_queue_state.lua");
@@ -152,7 +153,8 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
                 joinKeys(performanceId, userIdHash, candidateQueueId),
                 candidateQueueId,
                 userIdHash,
-                ttlDuration(queueTtl).toMillis()
+                ttlDuration(queueTtl).toMillis(),
+                WAITING_MARKER_TTL_MILLIS
         );
     }
 
