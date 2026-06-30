@@ -4,6 +4,7 @@ import static org.mockito.Mockito.verify;
 
 import com.ticket.queue.config.QueueProperties;
 import com.ticket.queue.domain.AdmissionStateStore;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 class AdmissionAdvancerTest {
@@ -18,7 +19,7 @@ class AdmissionAdvancerTest {
 
         advancer.advance(1L);
 
-        verify(admissionStateStore).advancePublicState(1L, 2, 10);
+        verify(admissionStateStore).advancePublicState(1L, 2, 10, Duration.ofHours(24));
     }
 
     @Test
@@ -31,6 +32,6 @@ class AdmissionAdvancerTest {
 
         advancer.advance(1L);
 
-        verify(admissionStateStore).advancePublicState(1L, 50, 300);
+        verify(admissionStateStore).advancePublicState(1L, 50, 300, Duration.ofHours(24));
     }
 }

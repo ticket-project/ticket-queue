@@ -19,7 +19,8 @@ public class AdmissionAdvancer {
         admissionStateStore.advancePublicState(
                 performanceId,
                 queueProperties.getDefaultMaxAdmitPerSecond(),
-                queueProperties.getDefaultMaxActiveSessions()
+                queueProperties.getDefaultMaxActiveSessions(),
+                queueProperties.getDefaultQueueTtl()
         );
     }
 }
