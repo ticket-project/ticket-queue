@@ -69,7 +69,7 @@ class AdmissionServiceTest {
         AuthenticatedMember member = new AuthenticatedMember(10L, "MEMBER");
         UUID queueUuid = UUID.fromString("00000000-0000-0000-0000-000000000001");
         when(uuidSupplier.get()).thenReturn(queueUuid);
-        when(admissionStateStore.joinQueue(eq(1L), anyString(), eq(queueUuid.toString()), eq(Duration.ofHours(24)), eq(5_000L)))
+        when(admissionStateStore.joinQueue(eq(1L), anyString(), eq(queueUuid.toString()), eq(Duration.ofHours(24))))
                 .thenReturn(new JoinResult(1L, queueUuid.toString(), 42L, true));
         when(queueTokenService.issue(new QueueTokenClaims(1L, queueUuid.toString(), 42L, 10L), Duration.ofHours(24)))
                 .thenReturn("queue-token");

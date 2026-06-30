@@ -26,16 +26,16 @@ public final class RedisKey {
         return "q:" + performanceHashTag(performanceId) + ":queue:" + queueId;
     }
 
+    public static String publicWaitingMarker(final Long performanceId) {
+        return "q:" + performanceHashTag(performanceId) + ":waiting-marker";
+    }
+
     public static String publicEntered(final Long performanceId, final String queueId) {
         return "q:" + performanceHashTag(performanceId) + ":entered:" + queueId;
     }
 
     public static String publicSessions(final Long performanceId) {
         return "q:" + performanceHashTag(performanceId) + ":sessions";
-    }
-
-    public static String publicJoinStream(final Long performanceId) {
-        return "q:" + performanceHashTag(performanceId) + ":join-stream";
     }
 
     public static String advanceLock(final Long performanceId) {

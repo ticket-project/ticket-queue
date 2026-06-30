@@ -102,7 +102,6 @@ q:{performanceId}:user:{userIdHash}    # 사용자별 중복 join 방지
 q:{performanceId}:queue:{queueId}      # 번호표 정보 hash
 q:{performanceId}:entered:{queueId}    # enter 멱등 처리 hash
 q:{performanceId}:sessions             # active session ZSET, score=expiresAtMillis
-q:{performanceId}:join-stream          # join 기록 stream
 queue:waiting:performances             # scheduler scan 대상 performanceId set
 ```
 

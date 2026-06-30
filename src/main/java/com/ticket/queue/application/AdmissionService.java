@@ -69,8 +69,7 @@ public class AdmissionService {
                 performanceId,
                 userIdHash(member),
                 uuidSupplier.get().toString(),
-                queueProperties.getDefaultQueueTtl(),
-                queueProperties.getDefaultRefreshAfterMs()
+                queueProperties.getDefaultQueueTtl()
         );
     }
 

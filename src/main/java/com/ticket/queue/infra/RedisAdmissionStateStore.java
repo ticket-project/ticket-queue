@@ -10,18 +10,21 @@ import com.ticket.queue.domain.EnterResult;
 import com.ticket.queue.domain.JoinResult;
 import com.ticket.queue.domain.PublicState;
 import java.time.Duration;
+import java.util.Map;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.redisson.api.RBucket;
 import org.redisson.api.RLock;
 import org.redisson.api.RMap;
 import org.redisson.api.RScript;
 import org.redisson.api.RSet;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.RedisException;
 import org.redisson.client.codec.StringCodec;
 import org.springframework.stereotype.Repository;
 
@@ -44,6 +47,7 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     private static final long ENTER_EXPIRED = 3L;
 
     private final RedissonClient redissonClient;
+    private final Map<String, String> scriptShaCache = new ConcurrentHashMap<>();
 
     @Override
     public Set<Long> findWaitingPerformanceIds() {
@@ -58,20 +62,19 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             final Long performanceId,
             final String userIdHash,
             final String candidateQueueId,
-            final Duration queueTtl,
-            final long refreshAfterMs
+            final Duration queueTtl
     ) {
         validatePositive(performanceId, "performanceId");
         validateNotBlank(userIdHash, "userIdHash");
         validateNotBlank(candidateQueueId, "candidateQueueId");
-        if (refreshAfterMs <= 0) {
-            throw new IllegalArgumentException("refreshAfterMs must be positive");
+
+        List<Object> result = runJoinScript(performanceId, userIdHash, candidateQueueId, queueTtl);
+        JoinResult joinResult = toJoinResult(performanceId, result);
+        if (shouldRegisterWaitingPerformance(result)) {
+            waitingPerformanceSet().add(performanceKey(performanceId));
         }
 
-        List<Object> result = runJoinScript(performanceId, userIdHash, candidateQueueId, queueTtl, refreshAfterMs);
-        waitingPerformanceSet().add(performanceKey(performanceId));
-
-        return toJoinResult(performanceId, result);
+        return joinResult;
     }
 
     @Override
@@ -115,7 +118,8 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     public void advancePublicState(
             final Long performanceId,
             final int maxAdmitPerSecond,
-            final int maxActiveSessions
+            final int maxActiveSessions,
+            final Duration stateTtl
     ) {
         validatePositive(performanceId, "performanceId");
         if (maxAdmitPerSecond <= 0 || maxActiveSessions <= 0) {
@@ -127,7 +131,7 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             return;
         }
         try {
-            runAdvanceScript(performanceId, maxAdmitPerSecond, maxActiveSessions);
+            runAdvanceScript(performanceId, maxAdmitPerSecond, maxActiveSessions, stateTtl);
             removeWaitingPerformanceIfNoPendingPublicQueue(performanceId);
         } finally {
             if (lock.isHeldByCurrentThread()) {
@@ -140,18 +144,15 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             final Long performanceId,
             final String userIdHash,
             final String candidateQueueId,
-            final Duration queueTtl,
-            final long refreshAfterMs
+            final Duration queueTtl
     ) {
-        return redissonClient.getScript(StringCodec.INSTANCE).eval(
-                RScript.Mode.READ_WRITE,
+        return evalScript(
                 JOIN_QUEUE_SCRIPT,
                 RScript.ReturnType.LIST,
                 joinKeys(performanceId, userIdHash, candidateQueueId),
                 candidateQueueId,
                 userIdHash,
-                ttlDuration(queueTtl).toMillis(),
-                refreshAfterMs
+                ttlDuration(queueTtl).toMillis()
         );
     }
 
@@ -162,10 +163,9 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     ) {
         return List.of(
                 RedisKey.publicSequence(performanceId),
-                RedisKey.publicState(performanceId),
                 RedisKey.publicUser(performanceId, userIdHash),
                 RedisKey.publicQueue(performanceId, candidateQueueId),
-                RedisKey.publicJoinStream(performanceId)
+                RedisKey.publicWaitingMarker(performanceId)
         );
     }
 
@@ -179,6 +179,10 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
                 asLong(result.get(1)),
                 asLong(result.get(2)) == 1L
         );
+    }
+
+    private boolean shouldRegisterWaitingPerformance(final List<Object> result) {
+        return result.size() > 3 && asLong(result.get(3)) == 1L;
     }
 
     private PublicState toPublicState(
@@ -215,8 +219,7 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             final Duration shoppingSessionTtl,
             final int maxActiveSessions
     ) {
-        return redissonClient.getScript(StringCodec.INSTANCE).eval(
-                RScript.Mode.READ_WRITE,
+        return evalScript(
                 ENTER_QUEUE_SCRIPT,
                 RScript.ReturnType.LIST,
                 enterKeys(performanceId, queueId),
@@ -256,16 +259,46 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     private void runAdvanceScript(
             final Long performanceId,
             final int maxAdmitPerSecond,
-            final int maxActiveSessions
+            final int maxActiveSessions,
+            final Duration stateTtl
     ) {
-        redissonClient.getScript(StringCodec.INSTANCE).eval(
-                RScript.Mode.READ_WRITE,
+        evalScript(
                 ADVANCE_QUEUE_STATE_SCRIPT,
                 RScript.ReturnType.LONG,
-                List.of(RedisKey.publicState(performanceId), RedisKey.publicSessions(performanceId)),
+                List.of(
+                        RedisKey.publicState(performanceId),
+                        RedisKey.publicSessions(performanceId),
+                        RedisKey.publicSequence(performanceId)
+                ),
                 maxAdmitPerSecond,
-                maxActiveSessions
+                maxActiveSessions,
+                ttlDuration(stateTtl).toMillis()
         );
+    }
+
+    private <T> T evalScript(
+            final String scriptBody,
+            final RScript.ReturnType returnType,
+            final List<Object> keys,
+            final Object... args
+    ) {
+        RScript script = redissonClient.getScript(StringCodec.INSTANCE);
+        String scriptSha = scriptShaCache.computeIfAbsent(scriptBody, script::scriptLoad);
+        try {
+            return script.evalSha(RScript.Mode.READ_WRITE, scriptSha, returnType, keys, args);
+        } catch (RedisException exception) {
+            if (!isNoScript(exception)) {
+                throw exception;
+            }
+            String reloadedSha = script.scriptLoad(scriptBody);
+            scriptShaCache.put(scriptBody, reloadedSha);
+            return script.evalSha(RScript.Mode.READ_WRITE, reloadedSha, returnType, keys, args);
+        }
+    }
+
+    private boolean isNoScript(final RedisException exception) {
+        String message = exception.getMessage();
+        return message != null && message.contains("NOSCRIPT");
     }
 
     private boolean tryAdvanceLock(final RLock lock) {
@@ -288,8 +321,21 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     private void removeWaitingPerformanceIfNoPendingPublicQueue(final Long performanceId) {
         PublicState state = readPublicState(performanceId, 1L);
         if (state.tailSeq() <= state.admittedUntilSeq()) {
-            waitingPerformanceSet().remove(performanceKey(performanceId));
+            RSet<String> waitingPerformances = waitingPerformanceSet();
+            String performanceKey = performanceKey(performanceId);
+            waitingPerformances.remove(performanceKey);
+            if (waitingMarkerExists(performanceId)) {
+                waitingPerformances.add(performanceKey);
+            }
         }
+    }
+
+    private boolean waitingMarkerExists(final Long performanceId) {
+        RBucket<String> marker = redissonClient.getBucket(
+                RedisKey.publicWaitingMarker(performanceId),
+                StringCodec.INSTANCE
+        );
+        return marker.isExists();
     }
 
     private String performanceKey(final Long value) {
