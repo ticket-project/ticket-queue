@@ -3,7 +3,9 @@ package com.ticket.queue.application;
 public record QueueTokenClaims(
         Long performanceId,
         String queueId,
-        Long seq,
+        int shardId,
+        Long localSeq,
+        Long slotId,
         Long memberId
 ) {
 }

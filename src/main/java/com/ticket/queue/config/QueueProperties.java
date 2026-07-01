@@ -17,6 +17,10 @@ public class QueueProperties {
     private int defaultMaxActiveSessions = 5_000;
     private int defaultMaxAdmitPerSecond = 500;
     private long defaultRefreshAfterMs = 5_000L;
+    private int shardCount = 128;
+    private long slotSizeMillis = 50L;
+    private long slotCloseGraceMillis = 200L;
+    private long joinPollAfterMs = 1_000L;
     private String queueTokenSecret;
     private boolean schedulerEnabled = true;
 }

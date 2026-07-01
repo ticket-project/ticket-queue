@@ -5,9 +5,13 @@ import com.ticket.queue.domain.JoinResult;
 public record JoinResponse(
         Long performanceId,
         String queueId,
-        Long seq,
         String status,
-        String queueToken
+        String queueToken,
+        int shardId,
+        Long localSeq,
+        Long slotId,
+        Long slotStartMillis,
+        Long pollAfterMs
 ) {
 
     private static final String WAITING = "WAITING";
@@ -15,8 +19,19 @@ public record JoinResponse(
     public static JoinResponse waiting(
             final Long performanceId,
             final JoinResult joinResult,
-            final String queueToken
+            final String queueToken,
+            final long pollAfterMs
     ) {
-        return new JoinResponse(performanceId, joinResult.queueId(), joinResult.seq(), WAITING, queueToken);
+        return new JoinResponse(
+                performanceId,
+                joinResult.queueId(),
+                WAITING,
+                queueToken,
+                joinResult.shardId(),
+                joinResult.localSeq(),
+                joinResult.slotId(),
+                joinResult.slotStartMillis(),
+                pollAfterMs
+        );
     }
 }
