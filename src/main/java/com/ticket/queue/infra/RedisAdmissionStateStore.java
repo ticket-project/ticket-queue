@@ -77,12 +77,12 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
         validateNotBlank(candidateQueueId, "candidateQueueId");
         validateShardSlot(shardSlot);
 
-        List<Object> result = runJoinScript(performanceId, userIdHash, candidateQueueId, shardSlot, queueTtl);
-        if (shouldRegisterWaitingPerformance(result)) {
+        JoinScriptResult result = runJoinScript(performanceId, userIdHash, candidateQueueId, shardSlot, queueTtl);
+        if (result.shouldRegisterWaitingPerformance()) {
             waitingPerformanceSet().add(performanceKey(performanceId));
         }
 
-        return toJoinResult(performanceId, shardSlot.shardId(), result);
+        return result.toJoinResult();
     }
 
     @Override
@@ -148,7 +148,7 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
         try {
             List<ShardQueueState> states = readShardStates(performanceId, shardCount, stateTtl);
             int rrCursor = readRoundRobinCursor(performanceId, shardCount);
-            int remaining = Math.min(maxAdmitPerSecond, Math.max(0, maxActiveSessions - totalActiveSessions(states)));
+            int remaining = Math.clamp(maxActiveSessions - totalActiveSessions(states), 0, maxAdmitPerSecond);
             long lastClosedSlotId = Math.floorDiv(System.currentTimeMillis() - slotCloseGraceMillis, slotSizeMillis);
 
             while (remaining > 0) {
@@ -156,21 +156,14 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
                 if (slotId < 0) {
                     break;
                 }
-                boolean progressed = false;
-                for (int offset = 0; offset < shardCount && remaining > 0; offset++) {
-                    int shardId = Math.floorMod(rrCursor + offset, shardCount);
-                    ShardQueueState state = states.get(shardId);
-                    if (state.canAdvance(slotId)) {
-                        ShardQueueState advanced = advanceShard(performanceId, shardId, 1, stateTtl);
-                        states.set(shardId, advanced);
-                        rrCursor = Math.floorMod(shardId + 1, shardCount);
-                        remaining--;
-                        progressed = true;
-                    }
-                }
-                if (!progressed) {
+
+                AdvancePlan plan = planSlotAdvances(states, slotId, remaining, rrCursor);
+                if (!plan.hasAdvances()) {
                     break;
                 }
+                applyAdvancePlan(performanceId, states, plan, stateTtl);
+                remaining -= plan.advancedCount();
+                rrCursor = plan.nextCursor();
             }
 
             publishPublicState(performanceId, states, shardCount, slotSizeMillis, refreshAfterMs, rrCursor);
@@ -182,14 +175,14 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
         }
     }
 
-    private List<Object> runJoinScript(
+    private JoinScriptResult runJoinScript(
             final Long performanceId,
             final String userIdHash,
             final String candidateQueueId,
             final QueueShardSlot shardSlot,
             final Duration queueTtl
     ) {
-        return evalScript(
+        List<Object> result = evalScript(
                 JOIN_QUEUE_SCRIPT,
                 RScript.ReturnType.LIST,
                 joinKeys(performanceId, userIdHash, candidateQueueId, shardSlot.shardId()),
@@ -200,6 +193,7 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
                 shardSlot.slotStartMillis(),
                 WAITING_MARKER_TTL_MILLIS
         );
+        return JoinScriptResult.from(performanceId, shardSlot.shardId(), result);
     }
 
     private List<Object> joinKeys(
@@ -216,26 +210,6 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
                 RedisKey.shardPendingSlots(performanceId, shardId),
                 RedisKey.shardWaitingMarker(performanceId, shardId)
         );
-    }
-
-    private JoinResult toJoinResult(
-            final Long performanceId,
-            final int shardId,
-            final List<Object> result
-    ) {
-        return new JoinResult(
-                performanceId,
-                asString(result.get(0)),
-                shardId,
-                asLong(result.get(1)),
-                asLong(result.get(2)),
-                asLong(result.get(3)),
-                asLong(result.get(4)) == 1L
-        );
-    }
-
-    private boolean shouldRegisterWaitingPerformance(final List<Object> result) {
-        return result.size() > 5 && asLong(result.get(5)) == 1L;
     }
 
     private PublicState toPublicState(
@@ -415,6 +389,48 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
         return Math.toIntExact(states.stream().mapToLong(ShardQueueState::activeCount).sum());
     }
 
+    private AdvancePlan planSlotAdvances(
+            final List<ShardQueueState> states,
+            final long slotId,
+            final int capacity,
+            final int initialCursor
+    ) {
+        int[] increments = new int[states.size()];
+        int remaining = capacity;
+        int cursor = initialCursor;
+        boolean progressed;
+        do {
+            progressed = false;
+            int passCursor = cursor;
+            for (int offset = 0; offset < states.size() && remaining > 0; offset++) {
+                int shardId = Math.floorMod(passCursor + offset, states.size());
+                ShardQueueState state = states.get(shardId);
+                if (state.canAdvance(slotId, increments[shardId])) {
+                    increments[shardId]++;
+                    remaining--;
+                    cursor = Math.floorMod(shardId + 1, states.size());
+                    progressed = true;
+                }
+            }
+        } while (progressed && remaining > 0);
+
+        return new AdvancePlan(increments, capacity - remaining, cursor);
+    }
+
+    private void applyAdvancePlan(
+            final Long performanceId,
+            final List<ShardQueueState> states,
+            final AdvancePlan plan,
+            final Duration stateTtl
+    ) {
+        int[] increments = plan.increments();
+        for (int shardId = 0; shardId < increments.length; shardId++) {
+            if (increments[shardId] > 0) {
+                states.set(shardId, advanceShard(performanceId, shardId, increments[shardId], stateTtl));
+            }
+        }
+    }
+
     private long nextClosedSlotId(final List<ShardQueueState> states, final long lastClosedSlotId) {
         return states.stream()
                 .filter(state -> state.firstSlotId() >= 0)
@@ -571,8 +587,60 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             long firstSlotTail
     ) {
 
-        private boolean canAdvance(final long slotId) {
-            return firstSlotId == slotId && servingSeq < firstSlotTail;
+        private boolean canAdvance(final long slotId, final int plannedIncrement) {
+            return firstSlotId == slotId && servingSeq + plannedIncrement < firstSlotTail;
+        }
+    }
+
+    private record AdvancePlan(
+            int[] increments,
+            int advancedCount,
+            int nextCursor
+    ) {
+
+        private boolean hasAdvances() {
+            return advancedCount > 0;
+        }
+    }
+
+    private record JoinScriptResult(
+            Long performanceId,
+            String queueId,
+            int shardId,
+            long localSeq,
+            long slotId,
+            long slotStartMillis,
+            boolean created,
+            boolean shouldRegisterWaitingPerformance
+    ) {
+
+        private static JoinScriptResult from(
+                final Long performanceId,
+                final int shardId,
+                final List<Object> result
+        ) {
+            return new JoinScriptResult(
+                    performanceId,
+                    asString(result.get(0)),
+                    shardId,
+                    asLong(result.get(1)),
+                    asLong(result.get(2)),
+                    asLong(result.get(3)),
+                    asLong(result.get(4)) == 1L,
+                    result.size() > 5 && asLong(result.get(5)) == 1L
+            );
+        }
+
+        private JoinResult toJoinResult() {
+            return new JoinResult(
+                    performanceId,
+                    queueId,
+                    shardId,
+                    localSeq,
+                    slotId,
+                    slotStartMillis,
+                    created
+            );
         }
     }
 }

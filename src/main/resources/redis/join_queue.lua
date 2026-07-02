@@ -1,3 +1,22 @@
+-- KEYS:
+-- 1 shard-local sequence
+-- 2 shard-local user entry
+-- 3 shard-local queue ticket
+-- 4 shard-local slot tail hash
+-- 5 shard-local pending slot set
+-- 6 shard-local waiting marker
+--
+-- ARGV:
+-- 1 candidate queue id
+-- 2 user id hash
+-- 3 queue ttl millis
+-- 4 slot id
+-- 5 slot start millis
+-- 6 waiting marker ttl millis
+--
+-- Returns:
+-- queue_id, local_seq, slot_id, slot_start_millis, created, register_waiting_performance
+
 local existing = redis.call('GET', KEYS[2])
 if existing and existing ~= '' then
   local first = string.find(existing, '|', 1, true)

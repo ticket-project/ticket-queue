@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -280,6 +281,50 @@ class RedisAdmissionStateStoreTest {
 
         store.advancePublicState(1L, 10, 5_000, 128, 50L, 200L, Duration.ofHours(24), 5_000L);
 
+        verify(stateMap).putAll(any(Map.class));
+        verify(lock).unlock();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void advancePublicState_batches_multiple_admissions_for_the_same_shard() throws InterruptedException {
+        RedissonClient redissonClient = mock(RedissonClient.class);
+        RScript script = mock(RScript.class);
+        RLock lock = mock(RLock.class);
+        RMap<String, String> stateMap = mock(RMap.class);
+        RedisAdmissionStateStore store = new RedisAdmissionStateStore(redissonClient);
+        ArgumentCaptor<Object[]> argsCaptor = ArgumentCaptor.forClass(Object[].class);
+
+        when(redissonClient.getLock(RedisKey.advanceLock(1L))).thenReturn(lock);
+        when(lock.tryLock(0L, 5_000L, TimeUnit.MILLISECONDS)).thenReturn(true);
+        when(lock.isHeldByCurrentThread()).thenReturn(true);
+        when(redissonClient.getScript(StringCodec.INSTANCE)).thenReturn(script);
+        when(redissonClient.<String, String>getMap(RedisKey.publicState(1L), StringCodec.INSTANCE))
+                .thenReturn(stateMap);
+        when(stateMap.get("rrCursor")).thenReturn("0");
+        when(script.scriptLoad(anyString())).thenReturn("advance-sha");
+        when(script.evalSha(
+                eq(RScript.Mode.READ_WRITE),
+                eq("advance-sha"),
+                eq(RScript.ReturnType.LIST),
+                any(List.class),
+                any(Object[].class)
+        )).thenReturn(
+                List.of(0L, 3L, 0L, 0L, 3L),
+                List.of(3L, 4L, 0L, 1L, 4L)
+        );
+
+        store.advancePublicState(1L, 3, 10, 1, 50L, 200L, Duration.ofHours(24), 5_000L);
+
+        verify(script, times(2)).evalSha(
+                eq(RScript.Mode.READ_WRITE),
+                eq("advance-sha"),
+                eq(RScript.ReturnType.LIST),
+                any(List.class),
+                argsCaptor.capture()
+        );
+        assertThat(argsCaptor.getAllValues().get(0)).containsExactly("SNAPSHOT", 86_400_000L);
+        assertThat(argsCaptor.getAllValues().get(1)).containsExactly("ADVANCE", 86_400_000L, 3);
         verify(stateMap).putAll(any(Map.class));
         verify(lock).unlock();
     }
