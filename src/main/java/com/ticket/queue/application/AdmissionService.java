@@ -10,6 +10,7 @@ import com.ticket.queue.domain.AdmissionStateStore;
 import com.ticket.queue.domain.EnterResult;
 import com.ticket.queue.domain.JoinResult;
 import com.ticket.queue.domain.PublicState;
+import com.ticket.queue.domain.QueueShardSlot;
 import com.ticket.queue.domain.UuidSupplier;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -30,12 +31,13 @@ public class AdmissionService {
     private final RedirectProperties redirectProperties;
     private final QueueProperties queueProperties;
     private final UuidSupplier uuidSupplier;
+    private final QueueShardSlotCalculator queueShardSlotCalculator;
 
     public JoinResponse join(final Long performanceId, final AuthenticatedMember member) {
         JoinResult join = joinState(performanceId, member);
         String queueToken = issueQueueToken(performanceId, join, member);
 
-        return JoinResponse.waiting(performanceId, join, queueToken);
+        return JoinResponse.waiting(performanceId, join, queueToken, queueProperties.getJoinPollAfterMs());
     }
 
     public PublicStateResponse state(final Long performanceId) {
@@ -65,10 +67,13 @@ public class AdmissionService {
             final Long performanceId,
             final AuthenticatedMember member
     ) {
+        String userIdHash = userIdHash(member);
+        QueueShardSlot shardSlot = queueShardSlotCalculator.calculate(performanceId, member.memberId());
         return admissionStateStore.joinQueue(
                 performanceId,
-                userIdHash(member),
+                userIdHash,
                 uuidSupplier.get().toString(),
+                shardSlot,
                 queueProperties.getDefaultQueueTtl()
         );
     }
@@ -79,7 +84,14 @@ public class AdmissionService {
             final AuthenticatedMember member
     ) {
         return queueTokenService.issue(
-                new QueueTokenClaims(performanceId, join.queueId(), join.seq(), member.memberId()),
+                new QueueTokenClaims(
+                        performanceId,
+                        join.queueId(),
+                        join.shardId(),
+                        join.localSeq(),
+                        join.slotId(),
+                        member.memberId()
+                ),
                 queueProperties.getDefaultQueueTtl()
         );
     }
@@ -120,7 +132,8 @@ public class AdmissionService {
         return admissionStateStore.enterQueue(
                 performanceId,
                 claims.queueId(),
-                claims.seq(),
+                claims.shardId(),
+                claims.localSeq(),
                 admissionToken,
                 queueProperties.getShoppingSessionTtl(),
                 queueProperties.getDefaultMaxActiveSessions()

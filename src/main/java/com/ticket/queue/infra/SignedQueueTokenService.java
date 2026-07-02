@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class SignedQueueTokenService implements QueueTokenService {
 
-    private static final String VERSION = "q1";
+    private static final String VERSION = "q2";
     private static final String DELIMITER = ".";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final Base64.Encoder BASE64_URL_ENCODER = Base64.getUrlEncoder().withoutPadding();
@@ -46,8 +46,8 @@ public class SignedQueueTokenService implements QueueTokenService {
         validateClaims(claims);
         validateTtl(ttl);
 
-        Instant issuedAt = clock.instant();
-        return buildToken(claims, issuedAt.plus(ttl));
+        Instant expiresAt = clock.instant().plus(ttl);
+        return buildToken(claims, expiresAt);
     }
 
     @Override
@@ -55,16 +55,15 @@ public class SignedQueueTokenService implements QueueTokenService {
         return parse(token);
     }
 
-    private String buildToken(
-            final QueueTokenClaims claims,
-            final Instant expiresAt
-    ) {
+    private String buildToken(final QueueTokenClaims claims, final Instant expiresAt) {
         String signingInput = String.join(
                 DELIMITER,
                 VERSION,
                 Long.toString(claims.performanceId()),
                 encodeQueueId(claims.queueId()),
-                Long.toString(claims.seq()),
+                Integer.toString(claims.shardId()),
+                Long.toString(claims.localSeq()),
+                Long.toString(claims.slotId()),
                 Long.toString(claims.memberId()),
                 Long.toString(expiresAt.toEpochMilli())
         );
@@ -78,7 +77,7 @@ public class SignedQueueTokenService implements QueueTokenService {
 
         try {
             String[] parts = token.split("\\.", -1);
-            if (parts.length != 7 || !VERSION.equals(parts[0])) {
+            if (parts.length != 9 || !VERSION.equals(parts[0])) {
                 throw new QueueTokenException("queue token invalid");
             }
 
@@ -89,16 +88,18 @@ public class SignedQueueTokenService implements QueueTokenService {
                     parts[2],
                     parts[3],
                     parts[4],
-                    parts[5]
+                    parts[5],
+                    parts[6],
+                    parts[7]
             );
             if (!MessageDigest.isEqual(
                     sign(signingInput).getBytes(StandardCharsets.US_ASCII),
-                    parts[6].getBytes(StandardCharsets.US_ASCII)
+                    parts[8].getBytes(StandardCharsets.US_ASCII)
             )) {
                 throw new QueueTokenException("queue token invalid");
             }
 
-            long expiresAtMillis = readPositiveLongPart(parts[5], "expiresAt");
+            long expiresAtMillis = readPositiveLongPart(parts[7], "expiresAt");
             if (clock.instant().toEpochMilli() >= expiresAtMillis) {
                 throw new QueueTokenException("queue token expired");
             }
@@ -106,8 +107,10 @@ public class SignedQueueTokenService implements QueueTokenService {
             return new QueueTokenClaims(
                     readPositiveLongPart(parts[1], "performanceId"),
                     decodeQueueId(parts[2]),
-                    readPositiveLongPart(parts[3], "seq"),
-                    readPositiveLongPart(parts[4], "memberId")
+                    readNonNegativeIntPart(parts[3], "shardId"),
+                    readPositiveLongPart(parts[4], "localSeq"),
+                    readNonNegativeLongPart(parts[5], "slotId"),
+                    readPositiveLongPart(parts[6], "memberId")
             );
         } catch (QueueTokenException exception) {
             throw exception;
@@ -129,12 +132,32 @@ public class SignedQueueTokenService implements QueueTokenService {
     }
 
     private Long readPositiveLongPart(final String value, final String name) {
+        long parsed = readLongPart(value, name);
+        if (parsed <= 0) {
+            throw new QueueTokenException("queue token invalid " + name);
+        }
+        return parsed;
+    }
+
+    private Long readNonNegativeLongPart(final String value, final String name) {
+        long parsed = readLongPart(value, name);
+        if (parsed < 0) {
+            throw new QueueTokenException("queue token invalid " + name);
+        }
+        return parsed;
+    }
+
+    private int readNonNegativeIntPart(final String value, final String name) {
+        long parsed = readNonNegativeLongPart(value, name);
+        if (parsed > Integer.MAX_VALUE) {
+            throw new QueueTokenException("queue token invalid " + name);
+        }
+        return Math.toIntExact(parsed);
+    }
+
+    private long readLongPart(final String value, final String name) {
         try {
-            long parsed = Long.parseLong(value);
-            if (parsed <= 0) {
-                throw new QueueTokenException("queue token invalid " + name);
-            }
-            return parsed;
+            return Long.parseLong(value);
         } catch (NumberFormatException exception) {
             throw new QueueTokenException("queue token invalid " + name, exception);
         }
@@ -169,7 +192,9 @@ public class SignedQueueTokenService implements QueueTokenService {
         }
         validatePositive(claims.performanceId(), "performanceId");
         validateNotBlank(claims.queueId(), "queueId");
-        validatePositive(claims.seq(), "seq");
+        validateNonNegative(claims.shardId(), "shardId");
+        validatePositive(claims.localSeq(), "localSeq");
+        validateNonNegative(claims.slotId(), "slotId");
         validatePositive(claims.memberId(), "memberId");
     }
 
@@ -182,6 +207,18 @@ public class SignedQueueTokenService implements QueueTokenService {
     private void validatePositive(final Long value, final String name) {
         if (value == null || value <= 0) {
             throw new IllegalArgumentException(name + " must be positive");
+        }
+    }
+
+    private void validateNonNegative(final long value, final String name) {
+        if (value < 0) {
+            throw new IllegalArgumentException(name + " must be non-negative");
+        }
+    }
+
+    private void validateNonNegative(final Long value, final String name) {
+        if (value == null || value < 0) {
+            throw new IllegalArgumentException(name + " must be non-negative");
         }
     }
 

@@ -21,14 +21,20 @@ class SignedQueueTokenServiceTest {
         SignedQueueTokenService service = new SignedQueueTokenService(queueProperties());
 
         String token = service.issue(
-                new QueueTokenClaims(1L, "queue-1", 42L, 10L),
+                new QueueTokenClaims(1L, "queue-1", 17, 42L, 24_691L, 10L),
                 Duration.ofHours(1)
         );
+
+        assertThat(token).startsWith("q2.");
+        assertThat(token).doesNotStartWith("eyJ");
+        assertThat(token.split("\\.", -1)).hasSize(9);
 
         QueueTokenClaims claims = service.verify(token);
         assertThat(claims.performanceId()).isEqualTo(1L);
         assertThat(claims.queueId()).isEqualTo("queue-1");
-        assertThat(claims.seq()).isEqualTo(42L);
+        assertThat(claims.shardId()).isEqualTo(17);
+        assertThat(claims.localSeq()).isEqualTo(42L);
+        assertThat(claims.slotId()).isEqualTo(24_691L);
         assertThat(claims.memberId()).isEqualTo(10L);
     }
 
@@ -37,19 +43,19 @@ class SignedQueueTokenServiceTest {
         SignedQueueTokenService service = new SignedQueueTokenService(queueProperties());
 
         String token = service.issue(
-                new QueueTokenClaims(1L, "queue-1", 42L, 10L),
+                new QueueTokenClaims(1L, "queue-1", 17, 42L, 24_691L, 10L),
                 Duration.ofHours(1)
         );
 
-        assertThat(token).startsWith("q1.");
-        assertThat(token.split("\\.", -1)).hasSize(7);
+        assertThat(token).startsWith("q2.");
+        assertThat(token.split("\\.", -1)).hasSize(9);
     }
 
     @Test
     void verify_rejects_tampered_token() {
         SignedQueueTokenService service = new SignedQueueTokenService(queueProperties());
         String token = service.issue(
-                new QueueTokenClaims(1L, "queue-1", 42L, 10L),
+                new QueueTokenClaims(1L, "queue-1", 17, 42L, 24_691L, 10L),
                 Duration.ofHours(1)
         );
 
@@ -65,7 +71,7 @@ class SignedQueueTokenServiceTest {
         Clock issuedClock = Clock.fixed(Instant.parse("2026-06-30T00:00:00Z"), ZoneOffset.UTC);
         Clock expiredClock = Clock.fixed(Instant.parse("2026-06-30T00:00:02Z"), ZoneOffset.UTC);
         String token = new SignedQueueTokenService(queueProperties(), issuedClock).issue(
-                new QueueTokenClaims(1L, "queue-1", 42L, 10L),
+                new QueueTokenClaims(1L, "queue-1", 17, 42L, 24_691L, 10L),
                 Duration.ofSeconds(1)
         );
 
