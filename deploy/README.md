@@ -19,30 +19,29 @@ sudo apt install -y docker.io docker-compose-plugin
 sudo systemctl enable docker
 sudo systemctl start docker
 sudo mkdir -p /opt/ticket-queue/nginx
+sudo mkdir -p /opt/ticket-queue/datadog/conf.d/redisdb.d
 sudo chown -R "$USER:$USER" /opt/ticket-queue
 ```
 
 GitHub Actions가 root가 아닌 사용자로 SSH 접속한다면 해당 사용자는 passwordless sudo로 `docker`를 실행할 수 있어야 한다.
 
-## Server-Owned Compose
+## GitHub Actions 업로드 파일
 
-Current behavior: GitHub Actions uploads `deploy/docker-compose.yml`, `deploy/nginx/default.conf`, and `deploy/datadog/conf.d/redisdb.d/conf.yaml` to `/opt/ticket-queue`. Runtime secrets still stay only in `/opt/ticket-queue/.env`.
-
-운영 `docker-compose.yml`은 VM의 `/opt/ticket-queue/docker-compose.yml`에서 직접 관리한다. GitHub Actions는 이 파일을 업로드하거나 덮어쓰지 않는다.
-
-GitHub Actions가 업로드하는 파일은 아래 하나뿐이다.
+GitHub Actions는 배포 시 아래 파일을 VM의 `/opt/ticket-queue` 아래로 업로드하고 덮어쓴다. 런타임 secret은 계속 VM의 `/opt/ticket-queue/.env`에만 둔다.
 
 ```text
+deploy/docker-compose.yml -> /opt/ticket-queue/docker-compose.yml
 deploy/nginx/default.conf -> /opt/ticket-queue/nginx/default.conf
+deploy/datadog/conf.d/redisdb.d/conf.yaml -> /opt/ticket-queue/datadog/conf.d/redisdb.d/conf.yaml
 ```
 
-따라서 Datadog Agent, `DD_API_KEY`, `DD_SITE`, `JAVA_TOOL_OPTIONS` 같은 운영 인프라 설정은 VM의 `/opt/ticket-queue/docker-compose.yml`에 직접 반영한다.
+따라서 Datadog Agent, `JAVA_TOOL_OPTIONS`, Redis 연동 설정은 repository의 `deploy/docker-compose.yml`과 Datadog 설정 파일에서 관리한다. 운영 secret 값은 `.env`에만 둔다.
 
 ## Environment
 
 `deploy/env.example`을 기준으로 VM에 `/opt/ticket-queue/.env`를 만들고 애플리케이션 secret 값을 교체한다. 실제 `.env`는 커밋하지 않는다.
 
-Datadog 설정은 core 서버와 동일하게 운영 `docker-compose.yml`에서 직접 관리한다.
+Datadog과 Managed Redis 설정은 `deploy/docker-compose.yml`이 참조하는 환경변수로 주입한다.
 
 ## GitHub Secrets
 

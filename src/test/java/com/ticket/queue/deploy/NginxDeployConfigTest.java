@@ -122,10 +122,10 @@ class NginxDeployConfigTest {
                 .doesNotContain("DD_CONTAINER_EXCLUDE_METRICS: name:ticket-queue-redis");
 
         assertThat(redisIntegration)
-                .contains("host: %%env_REDIS_HOST%%")
-                .contains("port: %%env_REDIS_PORT%%")
-                .contains("username: %%env_REDIS_USERNAME%%")
-                .contains("password: %%env_REDIS_PASSWORD%%")
+                .contains("host: \"%%env_REDIS_HOST%%\"")
+                .contains("port: \"%%env_REDIS_PORT%%\"")
+                .contains("username: \"%%env_REDIS_USERNAME%%\"")
+                .contains("password: \"%%env_REDIS_PASSWORD%%\"")
                 .contains("ssl: true")
                 .contains("service:ticket-managed-redis");
     }
