@@ -27,6 +27,15 @@ public interface AdmissionStateStore {
             int maxActiveSessions
     );
 
+    EnterResult enterLegacyQueue(
+            Long performanceId,
+            String queueId,
+            Long seq,
+            String admissionToken,
+            Duration shoppingSessionTtl,
+            int maxActiveSessions
+    );
+
     void advancePublicState(
             Long performanceId,
             int maxAdmitPerSecond,

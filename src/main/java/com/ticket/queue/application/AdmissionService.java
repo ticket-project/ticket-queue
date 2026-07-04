@@ -129,6 +129,16 @@ public class AdmissionService {
             final QueueTokenClaims claims,
             final String admissionToken
     ) {
+        if (claims.legacy()) {
+            return admissionStateStore.enterLegacyQueue(
+                    performanceId,
+                    claims.queueId(),
+                    claims.localSeq(),
+                    admissionToken,
+                    queueProperties.getShoppingSessionTtl(),
+                    queueProperties.getDefaultMaxActiveSessions()
+            );
+        }
         return admissionStateStore.enterQueue(
                 performanceId,
                 claims.queueId(),

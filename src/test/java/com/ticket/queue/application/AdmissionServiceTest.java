@@ -116,6 +116,7 @@ class AdmissionServiceTest {
 
         assertThat(response.performanceId()).isEqualTo(1L);
         assertThat(response.queueId()).isEqualTo(queueUuid.toString());
+        assertThat(response.seq()).isEqualTo(42L);
         assertThat(response.shardId()).isEqualTo(expectedShardSlot.shardId());
         assertThat(response.localSeq()).isEqualTo(42L);
         assertThat(response.slotId()).isEqualTo(expectedShardSlot.slotId());
@@ -146,6 +147,8 @@ class AdmissionServiceTest {
         assertThat(response.slotSizeMillis()).isEqualTo(50L);
         assertThat(response.serving()).containsEntry(0, 100L);
         assertThat(response.tail()).containsEntry(0, 1_000L);
+        assertThat(response.admittedUntilSeq()).isEqualTo(100L);
+        assertThat(response.tailSeq()).isEqualTo(1_000L);
         assertThat(response.refreshAfterMs()).isEqualTo(5_000L);
         assertThat(response.serverTimeMillis()).isEqualTo(1_717_000_000_000L);
     }
@@ -193,6 +196,35 @@ class AdmissionServiceTest {
         assertThat(response.admissionToken()).isEqualTo("admission-token");
         assertThat(response.expiresAtMillis()).isEqualTo(1_717_000_900_000L);
         assertThat(response.redirectUrl()).isEqualTo("/booking/seat?performanceId=1");
+    }
+
+    @Test
+    void enter_uses_legacy_store_path_for_legacy_queue_token() {
+        when(queueTokenService.verify("legacy-token"))
+                .thenReturn(QueueTokenClaims.legacy(1L, "queue-1", 100L, 10L));
+        when(admissionTokenIssuer.issue(10L, 1L, "queue-1", Duration.ofMinutes(15)))
+                .thenReturn("candidate-admission-token");
+        when(admissionStateStore.enterLegacyQueue(
+                1L,
+                "queue-1",
+                100L,
+                "candidate-admission-token",
+                Duration.ofMinutes(15),
+                5_000
+        )).thenReturn(EnterResult.admitted("admission-token", 1_717_000_900_000L));
+
+        EnterResponse response = service.enter(1L, "legacy-token");
+
+        assertThat(response.admissionToken()).isEqualTo("admission-token");
+        verify(admissionStateStore, never()).enterQueue(
+                eq(1L),
+                eq("queue-1"),
+                eq(0),
+                eq(100L),
+                eq("candidate-admission-token"),
+                eq(Duration.ofMinutes(15)),
+                eq(5_000)
+        );
     }
 
     @Test

@@ -51,6 +51,7 @@ class AdmissionControllerTest {
                         "queue-1",
                         "WAITING",
                         "queue-token",
+                        42L,
                         17,
                         42L,
                         24_691L,
@@ -65,6 +66,7 @@ class AdmissionControllerTest {
                 .andExpect(jsonPath("$.queueId").value("queue-1"))
                 .andExpect(jsonPath("$.status").value("WAITING"))
                 .andExpect(jsonPath("$.queueToken").value("queue-token"))
+                .andExpect(jsonPath("$.seq").value(42))
                 .andExpect(jsonPath("$.shardId").value(17))
                 .andExpect(jsonPath("$.localSeq").value(42))
                 .andExpect(jsonPath("$.slotId").value(24_691))
@@ -94,6 +96,8 @@ class AdmissionControllerTest {
                         50L,
                         java.util.Map.of(0, 100L, 1, 90L),
                         java.util.Map.of(0, 1_000L, 1, 900L),
+                        100L,
+                        1_000L,
                         5_000L,
                         1_717_000_000_000L
                 ));
@@ -106,6 +110,8 @@ class AdmissionControllerTest {
                 .andExpect(jsonPath("$.slotSizeMillis").value(50))
                 .andExpect(jsonPath("$.serving.0").value(100))
                 .andExpect(jsonPath("$.tail.0").value(1000))
+                .andExpect(jsonPath("$.admittedUntilSeq").value(100))
+                .andExpect(jsonPath("$.tailSeq").value(1000))
                 .andExpect(jsonPath("$.refreshAfterMs").value(5000))
                 .andExpect(jsonPath("$.serverTimeMillis").value(1_717_000_000_000L));
 

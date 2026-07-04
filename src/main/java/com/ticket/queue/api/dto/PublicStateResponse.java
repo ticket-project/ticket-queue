@@ -10,6 +10,8 @@ public record PublicStateResponse(
         long slotSizeMillis,
         Map<Integer, Long> serving,
         Map<Integer, Long> tail,
+        Long admittedUntilSeq,
+        Long tailSeq,
         Long refreshAfterMs,
         Long serverTimeMillis
 ) {
@@ -22,8 +24,18 @@ public record PublicStateResponse(
                 publicState.slotSizeMillis(),
                 publicState.serving(),
                 publicState.tail(),
+                maxValue(publicState.serving()),
+                maxValue(publicState.tail()),
                 publicState.refreshAfterMs(),
                 publicState.serverTimeMillis()
         );
+    }
+
+    private static Long maxValue(final Map<Integer, Long> values) {
+        return values.values()
+                .stream()
+                .mapToLong(Long::longValue)
+                .max()
+                .orElse(0L);
     }
 }

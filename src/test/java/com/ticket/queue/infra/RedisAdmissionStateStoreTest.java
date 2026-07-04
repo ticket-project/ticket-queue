@@ -79,6 +79,7 @@ class RedisAdmissionStateStoreTest {
         assertThat(RedisKey.shardSessions(1L, 17)).isEqualTo("q:{1:17}:sessions");
         assertThat(RedisKey.performanceSessions(1L)).isEqualTo("q:{1}:sessions");
         assertThat(RedisKey.performanceEntered(1L, "queue-1")).isEqualTo("q:{1}:entered:queue-1");
+        assertThat(RedisKey.legacyQueue(1L, "queue-1")).isEqualTo("q:{1}:queue:queue-1");
         assertThat(RedisKey.shardSlotTail(1L, 17)).isEqualTo("q:{1:17}:slot-tail");
         assertThat(RedisKey.shardPendingSlots(1L, 17)).isEqualTo("q:{1:17}:pending-slots");
         assertThat(RedisKey.shardWaitingMarker(1L, 17)).isEqualTo("q:{1:17}:waiting-marker");
@@ -275,6 +276,82 @@ class RedisAdmissionStateStoreTest {
                 .containsExactly(100L);
         assertThat(argsCaptor.getAllValues().get(2))
                 .containsExactly("admission-token", 900_000L, 5_000, 1L, "queue-1");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void readPublicState_skips_malformed_shard_map_entries() {
+        RedissonClient redissonClient = mock(RedissonClient.class);
+        RMap<String, String> stateMap = mock(RMap.class);
+        RedisAdmissionStateStore store = new RedisAdmissionStateStore(redissonClient);
+
+        when(redissonClient.<String, String>getMap(RedisKey.publicState(1L), StringCodec.INSTANCE))
+                .thenReturn(stateMap);
+        when(stateMap.readAllMap())
+                .thenReturn(Map.of(
+                        "status", "OPEN",
+                        "shardCount", "128",
+                        "slotSizeMillis", "50",
+                        "serving", "0:100,bad,2:not-a-number,3:300",
+                        "tail", "0:1000,broken:900",
+                        "refreshAfterMs", "5000"
+                ));
+
+        assertThat(store.readPublicState(1L, 1_000L))
+                .satisfies(state -> {
+                    assertThat(state.serving()).containsEntry(0, 100L);
+                    assertThat(state.serving()).containsEntry(3, 300L);
+                    assertThat(state.serving()).doesNotContainKey(2);
+                    assertThat(state.tail()).containsEntry(0, 1_000L);
+                    assertThat(state.tail()).doesNotContainKey(1);
+                });
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void enterLegacyQueue_uses_performance_global_legacy_keys() {
+        RedissonClient redissonClient = mock(RedissonClient.class);
+        RScript script = mock(RScript.class);
+        RedisAdmissionStateStore store = new RedisAdmissionStateStore(redissonClient);
+        ArgumentCaptor<List<Object>> keysCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<Object[]> argsCaptor = ArgumentCaptor.forClass(Object[].class);
+
+        when(redissonClient.getScript(StringCodec.INSTANCE)).thenReturn(script);
+        when(script.scriptLoad(anyString())).thenReturn("legacy-enter-sha");
+        when(script.evalSha(
+                eq(RScript.Mode.READ_WRITE),
+                eq("legacy-enter-sha"),
+                eq(RScript.ReturnType.LIST),
+                any(List.class),
+                any(Object[].class)
+        )).thenReturn(List.of(1L, "admission-token", 1_717_000_900_000L));
+
+        EnterResult actual = store.enterLegacyQueue(
+                1L,
+                "queue-1",
+                100L,
+                "admission-token",
+                Duration.ofMinutes(15),
+                5_000
+        );
+
+        assertThat(actual.status()).isEqualTo(EnterResult.Status.ADMITTED);
+        verify(script).evalSha(
+                eq(RScript.Mode.READ_WRITE),
+                eq("legacy-enter-sha"),
+                eq(RScript.ReturnType.LIST),
+                keysCaptor.capture(),
+                argsCaptor.capture()
+        );
+        assertThat(keysCaptor.getValue())
+                .containsExactly(
+                        RedisKey.publicState(1L),
+                        RedisKey.performanceEntered(1L, "queue-1"),
+                        RedisKey.performanceSessions(1L),
+                        RedisKey.legacyQueue(1L, "queue-1")
+                );
+        assertThat(argsCaptor.getValue())
+                .containsExactly(100L, "admission-token", 900_000L, 5_000);
     }
 
     @Test

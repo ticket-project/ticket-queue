@@ -40,6 +40,7 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     private static final String JOIN_QUEUE_SCRIPT = load("redis/join_queue.lua");
     private static final String ENTER_QUEUE_SCRIPT = load("redis/enter_queue.lua");
     private static final String ADMIT_QUEUE_SESSION_SCRIPT = load("redis/admit_queue_session.lua");
+    private static final String LEGACY_ENTER_QUEUE_SCRIPT = load("redis/legacy_enter_queue.lua");
     private static final String ADVANCE_QUEUE_STATE_SCRIPT = load("redis/advance_queue_state.lua");
     private static final String COUNT_ACTIVE_SESSIONS_SCRIPT = load("redis/count_active_sessions.lua");
     private static final String STATUS_OPEN = "OPEN";
@@ -49,6 +50,8 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     private static final String FIELD_SLOT_SIZE_MILLIS = "slotSizeMillis";
     private static final String FIELD_SERVING = "serving";
     private static final String FIELD_TAIL = "tail";
+    private static final String FIELD_ADMITTED_UNTIL_SEQ = "admittedUntilSeq";
+    private static final String FIELD_TAIL_SEQ = "tailSeq";
     private static final String FIELD_REFRESH_AFTER_MS = "refreshAfterMs";
     private static final String FIELD_RR_CURSOR = "rrCursor";
     private static final long ENTER_ADMITTED = 1L;
@@ -145,6 +148,34 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
                 shoppingSessionTtl,
                 maxActiveSessions,
                 SESSION_ADMIT_ENABLED
+        ));
+    }
+
+    @Override
+    public EnterResult enterLegacyQueue(
+            final Long performanceId,
+            final String queueId,
+            final Long seq,
+            final String admissionToken,
+            final Duration shoppingSessionTtl,
+            final int maxActiveSessions
+    ) {
+        validatePositive(performanceId, "performanceId");
+        validateNotBlank(queueId, "queueId");
+        validatePositive(seq, "seq");
+        validateNotBlank(admissionToken, "admissionToken");
+        if (maxActiveSessions <= 0) {
+            throw new IllegalArgumentException("maxActiveSessions must be positive");
+        }
+
+        return toEnterResult(evalScript(
+                LEGACY_ENTER_QUEUE_SCRIPT,
+                RScript.ReturnType.LIST,
+                legacyEnterKeys(performanceId, queueId),
+                seq,
+                admissionToken,
+                ttlDuration(shoppingSessionTtl).toMillis(),
+                maxActiveSessions
         ));
     }
 
@@ -327,6 +358,18 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
         return List.of(
                 RedisKey.performanceEntered(performanceId, queueId),
                 RedisKey.performanceSessions(performanceId)
+        );
+    }
+
+    private List<Object> legacyEnterKeys(
+            final Long performanceId,
+            final String queueId
+    ) {
+        return List.of(
+                RedisKey.publicState(performanceId),
+                RedisKey.performanceEntered(performanceId, queueId),
+                RedisKey.performanceSessions(performanceId),
+                RedisKey.legacyQueue(performanceId, queueId)
         );
     }
 
@@ -533,6 +576,8 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
         values.put(FIELD_SLOT_SIZE_MILLIS, String.valueOf(slotSizeMillis));
         values.put(FIELD_SERVING, encodeShardMap(serving));
         values.put(FIELD_TAIL, encodeShardMap(tail));
+        values.put(FIELD_ADMITTED_UNTIL_SEQ, String.valueOf(maxValue(serving)));
+        values.put(FIELD_TAIL_SEQ, String.valueOf(maxValue(tail)));
         values.put(FIELD_REFRESH_AFTER_MS, String.valueOf(refreshAfterMs));
         values.put(FIELD_RR_CURSOR, String.valueOf(rrCursor));
         values.put("serverTimeMillis", String.valueOf(System.currentTimeMillis()));
@@ -544,6 +589,14 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     private boolean hasPending(final Map<Integer, Long> serving, final Map<Integer, Long> tail) {
         return tail.entrySet().stream()
                 .anyMatch(entry -> entry.getValue() > serving.getOrDefault(entry.getKey(), 0L));
+    }
+
+    private long maxValue(final Map<Integer, Long> values) {
+        return values.values()
+                .stream()
+                .mapToLong(Long::longValue)
+                .max()
+                .orElse(0L);
     }
 
     private boolean hasPending(final List<ShardQueueState> states) {
