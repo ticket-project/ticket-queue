@@ -69,8 +69,10 @@ class NginxDeployConfigTest {
                 .contains("source: \"deploy/docker-compose.yml\"")
                 .contains("source: \"deploy/nginx/default.conf\"")
                 .contains("source: \"deploy/datadog/conf.d/redisdb.d/conf.yaml\"")
-                .contains("test -f /etc/letsencrypt/live/queue.oneticket.site/fullchain.pem")
-                .contains("test -f /etc/letsencrypt/live/queue.oneticket.site/privkey.pem")
+                .contains("sudo test -f /etc/letsencrypt/live/queue.oneticket.site/fullchain.pem")
+                .contains("sudo test -f /etc/letsencrypt/live/queue.oneticket.site/privkey.pem")
+                .contains("missing TLS certificate: /etc/letsencrypt/live/queue.oneticket.site/fullchain.pem")
+                .contains("missing TLS private key: /etc/letsencrypt/live/queue.oneticket.site/privkey.pem")
                 .doesNotContain("public-state")
                 .doesNotContain("queue-state");
     }
