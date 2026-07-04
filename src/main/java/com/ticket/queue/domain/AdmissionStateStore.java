@@ -11,12 +11,23 @@ public interface AdmissionStateStore {
             Long performanceId,
             String userIdHash,
             String candidateQueueId,
+            QueueShardSlot shardSlot,
             Duration queueTtl
     );
 
     PublicState readPublicState(Long performanceId, long refreshAfterMs);
 
     EnterResult enterQueue(
+            Long performanceId,
+            String queueId,
+            int shardId,
+            Long localSeq,
+            String admissionToken,
+            Duration shoppingSessionTtl,
+            int maxActiveSessions
+    );
+
+    EnterResult enterLegacyQueue(
             Long performanceId,
             String queueId,
             Long seq,
@@ -29,6 +40,10 @@ public interface AdmissionStateStore {
             Long performanceId,
             int maxAdmitPerSecond,
             int maxActiveSessions,
-            Duration stateTtl
+            int shardCount,
+            long slotSizeMillis,
+            long slotCloseGraceMillis,
+            Duration stateTtl,
+            long refreshAfterMs
     );
 }

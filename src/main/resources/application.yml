@@ -4,6 +4,16 @@ server:
 spring:
   application:
     name: ticket-queue
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:false}
+      cluster:
+        nodes: ${REDIS_CLUSTER_NODES:}
 
 management:
   endpoints:
@@ -14,6 +24,11 @@ management:
     health:
       probes:
         enabled: true
+  metrics:
+    tags:
+      service: ${DD_SERVICE:ticket-queue}
+      env: ${DD_ENV:local}
+      version: ${DD_VERSION:local}
 
 security:
   jwt:

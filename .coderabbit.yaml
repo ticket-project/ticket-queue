@@ -1,11 +1,7 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 
 language: ko-KR
-tone_instructions: >
-  모든 리뷰, 요약, 제안은 한국어로 작성하세요.
-  리뷰는 항상 심층적으로 수행하고, 패치만 보지 말고 주변 코드, 관련 테스트, 설정, 배포 파일까지 함께 확인하세요.
-  queue 서버의 대기열 상태 전이, Redis key/TTL, JWT/admission token 검증, public state 발행, 운영 설정 불일치 가능성을 우선 확인하세요.
-  근거가 약한 코멘트는 남기지 말고, 재현 조건이나 실패 시나리오가 분명한 문제를 중심으로 리뷰하세요.
+tone_instructions: "모든 리뷰와 제안은 한국어로 작성한다. 버그, 보안, 동시성, Redis TTL/상태 전이, 배포 설정 불일치, 테스트 공백을 우선 지적한다."
 
 reviews:
   profile: assertive
