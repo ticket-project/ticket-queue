@@ -19,11 +19,21 @@ sudo apt install -y docker.io docker-compose-plugin
 sudo systemctl enable docker
 sudo systemctl start docker
 sudo mkdir -p /opt/ticket-queue/nginx
+sudo mkdir -p /opt/ticket-queue/certbot/www
 sudo mkdir -p /opt/ticket-queue/datadog/conf.d/redisdb.d
 sudo chown -R "$USER:$USER" /opt/ticket-queue
 ```
 
 GitHub Actions가 root가 아닌 사용자로 SSH 접속한다면 해당 사용자는 passwordless sudo로 `docker`를 실행할 수 있어야 한다.
+
+Cloudflare SSL/TLS Full (Strict) 모드를 유지하려면 origin nginx도 443 HTTPS를 제공해야 한다. VM에는 Let's Encrypt 또는 Cloudflare Origin Certificate를 아래 경로에 준비한다. 인증서와 private key는 커밋하지 않는다.
+
+```text
+/etc/letsencrypt/live/queue.oneticket.site/fullchain.pem
+/etc/letsencrypt/live/queue.oneticket.site/privkey.pem
+```
+
+Certbot HTTP-01 webroot를 사용할 때는 `/opt/ticket-queue/certbot/www`를 challenge root로 사용한다.
 
 ## GitHub Actions 업로드 파일
 
@@ -81,7 +91,9 @@ master push
 ```bash
 cd /opt/ticket-queue
 sudo docker compose ps
+sudo ss -lntp | grep -E ':80|:443'
 curl -I http://localhost/api/v1/queue/performances/1/state
+curl -k -I https://localhost/api/v1/queue/performances/1/state
 curl -I https://queue.oneticket.site/api/v1/queue/performances/1/state
 ```
 
@@ -98,4 +110,4 @@ Cloudflare Cache Rule은 `/api/v1/queue/performances/*/state` GET 요청만 cach
 cf-cache-status: HIT
 ```
 
-Azure network security group은 `22`, `80`, 나중에 `443`만 연다. Redis `6379`와 queue `8090`은 직접 외부에 열지 않는다.
+Azure network security group은 `22`, `80`, `443`만 연다. Redis `6379`와 queue `8090`은 직접 외부에 열지 않는다.
