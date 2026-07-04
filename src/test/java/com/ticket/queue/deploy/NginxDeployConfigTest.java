@@ -24,8 +24,16 @@ class NginxDeployConfigTest {
         String config = read(NGINX_CONFIG);
 
         assertThat(config)
+                .contains("listen 80;")
+                .contains("return 301 https://$host$request_uri;")
+                .contains("listen 443 ssl;")
+                .contains("ssl_certificate /etc/letsencrypt/live/queue.oneticket.site/fullchain.pem;")
+                .contains("ssl_certificate_key /etc/letsencrypt/live/queue.oneticket.site/privkey.pem;")
+                .contains("location /.well-known/acme-challenge/ {")
+                .contains("root /var/www/certbot;")
                 .contains("location /api/v1/queue/ {")
                 .contains("proxy_pass http://queue:8090;")
+                .contains("proxy_set_header X-Forwarded-Proto https;")
                 .contains("proxy_hide_header Cache-Control;")
                 .contains("add_header Cache-Control \"no-store\" always;")
                 .contains("add_header X-Content-Type-Options \"nosniff\" always;")
@@ -43,6 +51,9 @@ class NginxDeployConfigTest {
 
         assertThat(compose)
                 .contains("./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro")
+                .contains("\"443:443\"")
+                .contains("./certbot/www:/var/www/certbot:ro")
+                .contains("/etc/letsencrypt:/etc/letsencrypt:ro")
                 .doesNotContain("./public-state")
                 .doesNotContain("/usr/share/nginx/html");
     }
@@ -53,10 +64,13 @@ class NginxDeployConfigTest {
 
         assertThat(workflow)
                 .contains("sudo mkdir -p /opt/ticket-queue/nginx")
+                .contains("sudo mkdir -p /opt/ticket-queue/certbot/www")
                 .contains("sudo mkdir -p /opt/ticket-queue/datadog/conf.d/redisdb.d")
                 .contains("source: \"deploy/docker-compose.yml\"")
                 .contains("source: \"deploy/nginx/default.conf\"")
                 .contains("source: \"deploy/datadog/conf.d/redisdb.d/conf.yaml\"")
+                .contains("test -f /etc/letsencrypt/live/queue.oneticket.site/fullchain.pem")
+                .contains("test -f /etc/letsencrypt/live/queue.oneticket.site/privkey.pem")
                 .doesNotContain("public-state")
                 .doesNotContain("queue-state");
     }
