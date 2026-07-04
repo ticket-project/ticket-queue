@@ -19,7 +19,23 @@ if existing_token then
   redis.call('DEL', KEYS[2])
 end
 
-local stored_seq = tonumber(redis.call('HGET', KEYS[4], 'seq') or '-1')
+local ticket_value = redis.call('GET', KEYS[4])
+local stored_seq = -1
+local queue_id = ''
+if ticket_value and ticket_value ~= '' then
+  local first_separator = string.find(ticket_value, '|', 1, true)
+  local second_separator = nil
+  if first_separator then
+    second_separator = string.find(ticket_value, '|', first_separator + 1, true)
+  end
+  if second_separator then
+    queue_id = string.sub(ticket_value, 1, first_separator - 1)
+    stored_seq = tonumber(string.sub(ticket_value, first_separator + 1, second_separator - 1)) or -1
+  end
+else
+  stored_seq = tonumber(redis.call('HGET', KEYS[4], 'seq') or '-1')
+  queue_id = redis.call('HGET', KEYS[4], 'queueId') or ''
+end
 if stored_seq ~= seq then
   return {3, '', 0}
 end
@@ -34,7 +50,6 @@ if active_count >= max_active_sessions then
   return {2, '', 0}
 end
 
-local queue_id = redis.call('HGET', KEYS[4], 'queueId')
 redis.call('HSET', KEYS[2], 'admissionToken', admission_token, 'expiresAtMillis', expires_at_millis)
 redis.call('PEXPIRE', KEYS[2], session_ttl_millis)
 redis.call('ZADD', KEYS[3], expires_at_millis, queue_id)

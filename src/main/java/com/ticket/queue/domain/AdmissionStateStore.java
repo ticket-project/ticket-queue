@@ -11,8 +11,7 @@ public interface AdmissionStateStore {
             Long performanceId,
             String userIdHash,
             String candidateQueueId,
-            Duration queueTtl,
-            long refreshAfterMs
+            Duration queueTtl
     );
 
     PublicState readPublicState(Long performanceId, long refreshAfterMs);
@@ -29,6 +28,7 @@ public interface AdmissionStateStore {
     void advancePublicState(
             Long performanceId,
             int maxAdmitPerSecond,
-            int maxActiveSessions
+            int maxActiveSessions,
+            Duration stateTtl
     );
 }
