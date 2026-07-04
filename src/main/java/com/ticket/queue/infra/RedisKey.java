@@ -18,6 +18,14 @@ public final class RedisKey {
         return "q:" + performanceHashTag(performanceId) + ":state";
     }
 
+    public static String performanceSessions(final Long performanceId) {
+        return "q:" + performanceHashTag(performanceId) + ":sessions";
+    }
+
+    public static String performanceEntered(final Long performanceId, final String queueId) {
+        return "q:" + performanceHashTag(performanceId) + ":entered:" + queueId;
+    }
+
     public static String shardState(final Long performanceId, final int shardId) {
         return "q:" + shardHashTag(performanceId, shardId) + ":state";
     }

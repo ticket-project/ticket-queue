@@ -12,12 +12,12 @@ import com.ticket.queue.domain.PublicState;
 import com.ticket.queue.domain.QueueShardSlot;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -39,7 +39,9 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     private static final long WAITING_MARKER_TTL_MILLIS = 10_000L;
     private static final String JOIN_QUEUE_SCRIPT = load("redis/join_queue.lua");
     private static final String ENTER_QUEUE_SCRIPT = load("redis/enter_queue.lua");
+    private static final String ADMIT_QUEUE_SESSION_SCRIPT = load("redis/admit_queue_session.lua");
     private static final String ADVANCE_QUEUE_STATE_SCRIPT = load("redis/advance_queue_state.lua");
+    private static final String COUNT_ACTIVE_SESSIONS_SCRIPT = load("redis/count_active_sessions.lua");
     private static final String STATUS_OPEN = "OPEN";
     private static final String STATUS_EMPTY = "EMPTY";
     private static final String FIELD_STATUS = "status";
@@ -52,6 +54,8 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     private static final long ENTER_ADMITTED = 1L;
     private static final long ENTER_FULL = 2L;
     private static final long ENTER_EXPIRED = 3L;
+    private static final long SESSION_ADMIT_DISABLED = 0L;
+    private static final long SESSION_ADMIT_ENABLED = 1L;
 
     private final RedissonClient redissonClient;
     private final Map<String, String> scriptShaCache = new ConcurrentHashMap<>();
@@ -114,14 +118,33 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             throw new IllegalArgumentException("maxActiveSessions must be positive");
         }
 
-        return toEnterResult(runEnterScript(
+        EnterResult existing = toEnterResult(runSessionScript(
                 performanceId,
                 queueId,
-                shardId,
-                localSeq,
                 admissionToken,
                 shoppingSessionTtl,
-                maxActiveSessions
+                maxActiveSessions,
+                SESSION_ADMIT_DISABLED
+        ));
+        if (existing.status() == EnterResult.Status.ADMITTED) {
+            return existing;
+        }
+
+        long readiness = asLong(runEnterReadinessScript(performanceId, queueId, shardId, localSeq).get(0));
+        if (readiness == ENTER_EXPIRED) {
+            return EnterResult.expired();
+        }
+        if (readiness != ENTER_ADMITTED) {
+            return EnterResult.notAdmitted();
+        }
+
+        return toEnterResult(runSessionScript(
+                performanceId,
+                queueId,
+                admissionToken,
+                shoppingSessionTtl,
+                maxActiveSessions,
+                SESSION_ADMIT_ENABLED
         ));
     }
 
@@ -137,7 +160,15 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             final long refreshAfterMs
     ) {
         validatePositive(performanceId, "performanceId");
-        if (maxAdmitPerSecond <= 0 || maxActiveSessions <= 0 || shardCount <= 0 || slotSizeMillis <= 0) {
+        if (maxAdmitPerSecond <= 0
+                || maxActiveSessions <= 0
+                || shardCount <= 0
+                || slotSizeMillis <= 0
+                || slotCloseGraceMillis < 0
+                || stateTtl == null
+                || stateTtl.isZero()
+                || stateTtl.isNegative()
+                || refreshAfterMs <= 0) {
             return;
         }
 
@@ -148,7 +179,8 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
         try {
             List<ShardQueueState> states = readShardStates(performanceId, shardCount, stateTtl);
             int rrCursor = readRoundRobinCursor(performanceId, shardCount);
-            int remaining = Math.clamp(maxActiveSessions - totalActiveSessions(states), 0, maxAdmitPerSecond);
+            int activeSessions = activeSessionCount(performanceId);
+            int remaining = Math.clamp(maxActiveSessions - activeSessions, 0, maxAdmitPerSecond);
             long lastClosedSlotId = Math.floorDiv(System.currentTimeMillis() - slotCloseGraceMillis, slotSizeMillis);
 
             while (remaining > 0) {
@@ -166,7 +198,7 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
                 rrCursor = plan.nextCursor();
             }
 
-            publishPublicState(performanceId, states, shardCount, slotSizeMillis, refreshAfterMs, rrCursor);
+            publishPublicState(performanceId, states, shardCount, slotSizeMillis, refreshAfterMs, rrCursor, stateTtl);
             removeWaitingPerformanceIfNoPendingShard(states, performanceId);
         } finally {
             if (lock.isHeldByCurrentThread()) {
@@ -243,23 +275,37 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
         return values.getOrDefault(FIELD_STATUS, hasPending(serving, tail) ? STATUS_OPEN : STATUS_EMPTY);
     }
 
-    private List<Object> runEnterScript(
+    private List<Object> runEnterReadinessScript(
             final Long performanceId,
             final String queueId,
             final int shardId,
-            final Long localSeq,
-            final String admissionToken,
-            final Duration shoppingSessionTtl,
-            final int maxActiveSessions
+            final Long localSeq
     ) {
         return evalScript(
                 ENTER_QUEUE_SCRIPT,
                 RScript.ReturnType.LIST,
                 enterKeys(performanceId, queueId, shardId),
-                localSeq,
+                localSeq
+        );
+    }
+
+    private List<Object> runSessionScript(
+            final Long performanceId,
+            final String queueId,
+            final String admissionToken,
+            final Duration shoppingSessionTtl,
+            final int maxActiveSessions,
+            final long admitRequested
+    ) {
+        return evalScript(
+                ADMIT_QUEUE_SESSION_SCRIPT,
+                RScript.ReturnType.LIST,
+                sessionKeys(performanceId, queueId),
                 admissionToken,
                 ttlDuration(shoppingSessionTtl).toMillis(),
-                maxActiveSessions
+                maxActiveSessions,
+                admitRequested,
+                queueId
         );
     }
 
@@ -270,9 +316,17 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     ) {
         return List.of(
                 RedisKey.shardState(performanceId, shardId),
-                RedisKey.shardEntered(performanceId, shardId, queueId),
-                RedisKey.shardSessions(performanceId, shardId),
                 RedisKey.shardQueue(performanceId, shardId, queueId)
+        );
+    }
+
+    private List<Object> sessionKeys(
+            final Long performanceId,
+            final String queueId
+    ) {
+        return List.of(
+                RedisKey.performanceEntered(performanceId, queueId),
+                RedisKey.performanceSessions(performanceId)
         );
     }
 
@@ -295,11 +349,14 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             final int shardCount,
             final Duration stateTtl
     ) {
-        List<ShardQueueState> states = new ArrayList<>(shardCount);
+        List<CompletableFuture<ShardQueueState>> futures = new ArrayList<>(shardCount);
         for (int shardId = 0; shardId < shardCount; shardId++) {
-            states.add(readShardState(performanceId, shardId, stateTtl));
+            final int id = shardId;
+            futures.add(CompletableFuture.supplyAsync(() -> readShardState(performanceId, id, stateTtl)));
         }
-        return states;
+        return futures.stream()
+                .map(CompletableFuture::join)
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     private ShardQueueState readShardState(
@@ -337,7 +394,6 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     private List<Object> shardStateKeys(final Long performanceId, final int shardId) {
         return List.of(
                 RedisKey.shardState(performanceId, shardId),
-                RedisKey.shardSessions(performanceId, shardId),
                 RedisKey.shardPendingSlots(performanceId, shardId),
                 RedisKey.shardSlotTail(performanceId, shardId),
                 RedisKey.shardSequence(performanceId, shardId)
@@ -385,8 +441,13 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
         return Math.floorMod(Math.toIntExact(parseLong(value, 0L)), shardCount);
     }
 
-    private int totalActiveSessions(final List<ShardQueueState> states) {
-        return Math.toIntExact(states.stream().mapToLong(ShardQueueState::activeCount).sum());
+    private int activeSessionCount(final Long performanceId) {
+        Long count = evalScript(
+                COUNT_ACTIVE_SESSIONS_SCRIPT,
+                RScript.ReturnType.LONG,
+                List.of(RedisKey.performanceSessions(performanceId))
+        );
+        return Math.toIntExact(count);
     }
 
     private AdvancePlan planSlotAdvances(
@@ -424,21 +485,30 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             final Duration stateTtl
     ) {
         int[] increments = plan.increments();
+        List<CompletableFuture<ShardQueueState>> futures = new ArrayList<>();
+        List<Integer> activeShardIds = new ArrayList<>();
         for (int shardId = 0; shardId < increments.length; shardId++) {
             if (increments[shardId] > 0) {
-                states.set(shardId, advanceShard(performanceId, shardId, increments[shardId], stateTtl));
+                final int id = shardId;
+                final int increment = increments[shardId];
+                activeShardIds.add(id);
+                futures.add(CompletableFuture.supplyAsync(() -> advanceShard(performanceId, id, increment, stateTtl)));
             }
+        }
+        for (int i = 0; i < futures.size(); i++) {
+            states.set(activeShardIds.get(i), futures.get(i).join());
         }
     }
 
     private long nextClosedSlotId(final List<ShardQueueState> states, final long lastClosedSlotId) {
-        return states.stream()
-                .filter(state -> state.firstSlotId() >= 0)
-                .filter(state -> state.firstSlotId() <= lastClosedSlotId)
-                .filter(state -> state.servingSeq() < state.firstSlotTail())
-                .min(Comparator.comparingLong(ShardQueueState::firstSlotId))
-                .map(ShardQueueState::firstSlotId)
-                .orElse(-1L);
+        long minSlotId = Long.MAX_VALUE;
+        for (ShardQueueState state : states) {
+            long slotId = state.firstSlotId();
+            if (slotId >= 0 && slotId <= lastClosedSlotId && state.hasPendingSlot() && slotId < minSlotId) {
+                minSlotId = slotId;
+            }
+        }
+        return minSlotId == Long.MAX_VALUE ? -1L : minSlotId;
     }
 
     private void publishPublicState(
@@ -447,7 +517,8 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             final int shardCount,
             final long slotSizeMillis,
             final long refreshAfterMs,
-            final int rrCursor
+            final int rrCursor,
+            final Duration stateTtl
     ) {
         Map<Integer, Long> serving = new LinkedHashMap<>();
         Map<Integer, Long> tail = new LinkedHashMap<>();
@@ -457,7 +528,7 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
         }
 
         Map<String, String> values = new LinkedHashMap<>();
-        values.put(FIELD_STATUS, hasPending(serving, tail) ? STATUS_OPEN : STATUS_EMPTY);
+        values.put(FIELD_STATUS, hasPending(states) ? STATUS_OPEN : STATUS_EMPTY);
         values.put(FIELD_SHARD_COUNT, String.valueOf(shardCount));
         values.put(FIELD_SLOT_SIZE_MILLIS, String.valueOf(slotSizeMillis));
         values.put(FIELD_SERVING, encodeShardMap(serving));
@@ -465,7 +536,9 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
         values.put(FIELD_REFRESH_AFTER_MS, String.valueOf(refreshAfterMs));
         values.put(FIELD_RR_CURSOR, String.valueOf(rrCursor));
         values.put("serverTimeMillis", String.valueOf(System.currentTimeMillis()));
-        publicStateMap(performanceId).putAll(values);
+        RMap<String, String> stateMap = publicStateMap(performanceId);
+        stateMap.putAll(values);
+        stateMap.expire(ttlDuration(stateTtl));
     }
 
     private boolean hasPending(final Map<Integer, Long> serving, final Map<Integer, Long> tail) {
@@ -474,7 +547,7 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     }
 
     private boolean hasPending(final List<ShardQueueState> states) {
-        return states.stream().anyMatch(state -> state.tailSeq() > state.servingSeq());
+        return states.stream().anyMatch(ShardQueueState::hasPendingSlot);
     }
 
     private String encodeShardMap(final Map<Integer, Long> values) {
@@ -491,7 +564,11 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
         for (String entry : encoded.split(",")) {
             String[] parts = entry.split(":", -1);
             if (parts.length == 2 && !parts[0].isBlank() && !parts[1].isBlank()) {
-                result.put(Integer.parseInt(parts[0]), Long.parseLong(parts[1]));
+                try {
+                    result.put(Integer.parseInt(parts[0]), Long.parseLong(parts[1]));
+                } catch (NumberFormatException ignored) {
+                    // Ignore malformed public state entries so one bad value does not break /state.
+                }
             }
         }
         return result;
@@ -532,11 +609,16 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             final Long performanceId,
             final List<ShardQueueState> states
     ) {
-        return states.stream()
+        List<CompletableFuture<Boolean>> futures = states.stream()
                 .map(ShardQueueState::shardId)
-                .anyMatch(shardId -> redissonClient
+                .map(shardId -> redissonClient
                         .getBucket(RedisKey.shardWaitingMarker(performanceId, shardId), StringCodec.INSTANCE)
-                        .isExists());
+                        .isExistsAsync()
+                        .toCompletableFuture())
+                .toList();
+        return futures.stream()
+                .map(CompletableFuture::join)
+                .anyMatch(Boolean::booleanValue);
     }
 
     private String performanceKey(final Long value) {
@@ -589,6 +671,10 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
 
         private boolean canAdvance(final long slotId, final int plannedIncrement) {
             return firstSlotId == slotId && servingSeq + plannedIncrement < firstSlotTail;
+        }
+
+        private boolean hasPendingSlot() {
+            return firstSlotId >= 0 && servingSeq < firstSlotTail;
         }
     }
 

@@ -43,6 +43,7 @@ local marker_ttl_millis = tonumber(ARGV[6])
 local time = redis.call('TIME')
 local now_millis = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
 local local_seq = redis.call('INCR', KEYS[1])
+redis.call('PEXPIRE', KEYS[1], ttl_millis)
 local ticket_value = queue_id .. '|' .. local_seq .. '|' .. slot_id .. '|' .. slot_start_millis .. '|' .. user_id_hash .. '|' .. now_millis
 
 redis.call('SET', KEYS[2], queue_id .. '|' .. local_seq .. '|' .. slot_id .. '|' .. slot_start_millis, 'PX', ttl_millis)
@@ -53,9 +54,5 @@ redis.call('PEXPIRE', KEYS[4], ttl_millis)
 redis.call('ZADD', KEYS[5], slot_id, tostring(slot_id))
 redis.call('PEXPIRE', KEYS[5], ttl_millis)
 
-local marker_created = redis.call('SET', KEYS[6], '1', 'PX', marker_ttl_millis, 'NX')
-if marker_created then
-  return {queue_id, local_seq, slot_id, slot_start_millis, 1, 1}
-end
-
-return {queue_id, local_seq, slot_id, slot_start_millis, 1, 0}
+redis.call('SET', KEYS[6], '1', 'PX', marker_ttl_millis)
+return {queue_id, local_seq, slot_id, slot_start_millis, 1, 1}
