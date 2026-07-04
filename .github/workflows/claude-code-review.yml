@@ -8,11 +8,7 @@ on:
         required: true
   pull_request:
     branches: [ "master", "develop" ]
-    types: [ready_for_review, reopened]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
-  cancel-in-progress: true
+    types: [opened, ready_for_review, reopened]
 
 jobs:
   claude-review:

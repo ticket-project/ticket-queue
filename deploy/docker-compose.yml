@@ -1,31 +1,23 @@
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: ticket-queue-redis
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis-data:/data
-    expose:
-      - "6379"
-
   queue:
     image: ${DOCKER_IMAGE:?DOCKER_IMAGE is required}
     container_name: ticket-queue
     restart: unless-stopped
     depends_on:
-      - redis
       - datadog-agent
     env_file:
       - path: .env
         required: false
     environment:
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_CLUSTER_NODES: ${REDIS_CLUSTER_NODES:?REDIS_CLUSTER_NODES is required}
+      SPRING_DATA_REDIS_USERNAME: ${REDIS_USERNAME:-default}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      SPRING_DATA_REDIS_SSL_ENABLED: ${REDIS_SSL_ENABLED:-true}
       JAVA_TOOL_OPTIONS: -javaagent:/opt/datadog/dd-java-agent.jar
       DD_AGENT_HOST: datadog-agent
       DD_SERVICE: ticket-queue
-      DD_ENV: prod
+      DD_ENV: ${DD_ENV:-prod}
+      DD_SITE: ${DD_SITE:-us5.datadoghq.com}
       DD_VERSION: ${DD_VERSION:-latest}
       DD_LOGS_INJECTION: "true"
       DD_RUNTIME_METRICS_ENABLED: "true"
@@ -33,7 +25,7 @@ services:
       - "8090"
     labels:
       com.datadoghq.tags.service: ticket-queue
-      com.datadoghq.tags.env: prod
+      com.datadoghq.tags.env: ${DD_ENV:-prod}
       com.datadoghq.tags.version: ${DD_VERSION:-latest}
       com.datadoghq.ad.logs: >-
         [{"source":"java","service":"ticket-queue"}]
@@ -59,7 +51,7 @@ services:
     cgroup: host
     environment:
       DD_API_KEY: ${DD_API_KEY:?DD_API_KEY is required}
-      DD_SITE: us5.datadoghq.com
+      DD_SITE: ${DD_SITE:-us5.datadoghq.com}
       DD_APM_ENABLED: "true"
       DD_APM_NON_LOCAL_TRAFFIC: "true"
       DD_LOGS_ENABLED: "true"
@@ -67,13 +59,15 @@ services:
       DD_LOGS_CONFIG_DOCKER_CONTAINER_USE_FILE: "true"
       DD_PROCESS_AGENT_ENABLED: "true"
       DD_CONTAINER_EXCLUDE_LOGS: name:datadog-agent
-      DD_ENV: prod
+      DD_ENV: ${DD_ENV:-prod}
+      REDIS_HOST: ${REDIS_HOST:?REDIS_HOST is required}
+      REDIS_PORT: ${REDIS_PORT:-10000}
+      REDIS_USERNAME: ${REDIS_USERNAME:-default}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /proc:/host/proc:ro
       - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
       - /opt/datadog-agent/run:/opt/datadog-agent/run:rw
-
-volumes:
-  redis-data:
+      - ./datadog/conf.d/redisdb.d/conf.yaml:/etc/datadog-agent/conf.d/redisdb.d/conf.yaml:ro

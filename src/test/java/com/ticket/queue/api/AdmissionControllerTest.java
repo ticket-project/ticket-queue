@@ -46,16 +46,32 @@ class AdmissionControllerTest {
         AuthenticatedMember member = new AuthenticatedMember(10L, "MEMBER");
         when(accessTokenVerifier.verify("Bearer access-token")).thenReturn(member);
         when(admissionService.join(1L, member))
-                .thenReturn(new JoinResponse(1L, "queue-1", 42L, "WAITING", "queue-token"));
+                .thenReturn(new JoinResponse(
+                        1L,
+                        "queue-1",
+                        "WAITING",
+                        "queue-token",
+                        42L,
+                        17,
+                        42L,
+                        24_691L,
+                        1_234_550L,
+                        1_000L
+                ));
 
         mockMvc.perform(post("/api/v1/queue/performances/{performanceId}/join", 1L)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.performanceId").value(1))
                 .andExpect(jsonPath("$.queueId").value("queue-1"))
-                .andExpect(jsonPath("$.seq").value(42))
                 .andExpect(jsonPath("$.status").value("WAITING"))
-                .andExpect(jsonPath("$.queueToken").value("queue-token"));
+                .andExpect(jsonPath("$.queueToken").value("queue-token"))
+                .andExpect(jsonPath("$.seq").value(42))
+                .andExpect(jsonPath("$.shardId").value(17))
+                .andExpect(jsonPath("$.localSeq").value(42))
+                .andExpect(jsonPath("$.slotId").value(24_691))
+                .andExpect(jsonPath("$.slotStartMillis").value(1_234_550))
+                .andExpect(jsonPath("$.pollAfterMs").value(1_000));
 
         verify(accessTokenVerifier).verify("Bearer access-token");
         verify(admissionService).join(1L, member);
@@ -76,6 +92,10 @@ class AdmissionControllerTest {
                 .thenReturn(new PublicStateResponse(
                         1L,
                         "OPEN",
+                        128,
+                        50L,
+                        java.util.Map.of(0, 100L, 1, 90L),
+                        java.util.Map.of(0, 1_000L, 1, 900L),
                         100L,
                         1_000L,
                         5_000L,
@@ -86,6 +106,10 @@ class AdmissionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.performanceId").value(1))
                 .andExpect(jsonPath("$.status").value("OPEN"))
+                .andExpect(jsonPath("$.shardCount").value(128))
+                .andExpect(jsonPath("$.slotSizeMillis").value(50))
+                .andExpect(jsonPath("$.serving.0").value(100))
+                .andExpect(jsonPath("$.tail.0").value(1000))
                 .andExpect(jsonPath("$.admittedUntilSeq").value(100))
                 .andExpect(jsonPath("$.tailSeq").value(1000))
                 .andExpect(jsonPath("$.refreshAfterMs").value(5000))

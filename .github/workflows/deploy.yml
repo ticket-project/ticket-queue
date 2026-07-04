@@ -62,7 +62,20 @@ jobs:
           script: |
             set -e
             sudo mkdir -p /opt/ticket-queue/nginx
+            sudo mkdir -p /opt/ticket-queue/datadog/conf.d/redisdb.d
             sudo chown -R "$USER:$USER" /opt/ticket-queue
+
+      - name: Upload docker compose config
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          port: ${{ secrets.AZURE_VM_PORT || '22' }}
+          source: "deploy/docker-compose.yml"
+          target: "/opt/ticket-queue"
+          strip_components: 1
+          overwrite: true
 
       - name: Upload nginx config
         uses: appleboy/scp-action@v0.1.7
@@ -72,6 +85,18 @@ jobs:
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           port: ${{ secrets.AZURE_VM_PORT || '22' }}
           source: "deploy/nginx/default.conf"
+          target: "/opt/ticket-queue"
+          strip_components: 1
+          overwrite: true
+
+      - name: Upload Datadog Redis config
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          port: ${{ secrets.AZURE_VM_PORT || '22' }}
+          source: "deploy/datadog/conf.d/redisdb.d/conf.yaml"
           target: "/opt/ticket-queue"
           strip_components: 1
           overwrite: true

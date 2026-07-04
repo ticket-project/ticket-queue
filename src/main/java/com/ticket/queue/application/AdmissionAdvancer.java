@@ -20,7 +20,11 @@ public class AdmissionAdvancer {
                 performanceId,
                 queueProperties.getDefaultMaxAdmitPerSecond(),
                 queueProperties.getDefaultMaxActiveSessions(),
-                queueProperties.getDefaultQueueTtl()
+                queueProperties.getShardCount(),
+                queueProperties.getSlotSizeMillis(),
+                queueProperties.getSlotCloseGraceMillis(),
+                queueProperties.getDefaultQueueTtl(),
+                queueProperties.getDefaultRefreshAfterMs()
         );
     }
 }
