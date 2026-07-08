@@ -45,13 +45,21 @@ deploy/nginx/default.conf -> /opt/ticket-queue/nginx/default.conf
 deploy/datadog/conf.d/redisdb.d/conf.yaml -> /opt/ticket-queue/datadog/conf.d/redisdb.d/conf.yaml
 ```
 
-따라서 Datadog Agent, `JAVA_TOOL_OPTIONS`, Redis 연동 설정은 repository의 `deploy/docker-compose.yml`과 Datadog 설정 파일에서 관리한다. 운영 secret 값은 `.env`에만 둔다.
+따라서 Datadog Agent, `JAVA_TOOL_OPTIONS`, 운영 Docker Redis 연결 설정은 repository의 `deploy/docker-compose.yml`과 Datadog 설정 파일에서 관리한다. 운영 secret 값은 `.env`에만 둔다. 로컬 개발용 `docker-compose.local.yml`은 VM에 업로드하지 않는다.
 
 ## Environment
 
 `deploy/env.example`을 기준으로 VM에 `/opt/ticket-queue/.env`를 만들고 애플리케이션 secret 값을 교체한다. 실제 `.env`는 커밋하지 않는다.
 
-Datadog과 Managed Redis 설정은 `deploy/docker-compose.yml`이 참조하는 환경변수로 주입한다.
+Datadog 설정과 Docker Redis 연결값은 `deploy/docker-compose.yml`에서 관리한다.
+
+운영 compose는 내부 전용 Redis service를 함께 띄운다. Queue Server는 별도 Spring profile 없이 compose 네트워크 안에서 `redis:6379` 단일 Redis에 연결하고, Redis `6379` 포트는 외부에 publish하지 않는다. Datadog Redis integration은 `DD_ENV`를 `env` 태그로 붙여 운영/로컬 모니터링이 섞이지 않게 한다.
+
+로컬 Redis가 필요하면 repository root에서 아래 명령만 실행한다. 이 compose 파일은 Redis 컨테이너만 제공하고 Datadog Agent나 Queue Server를 띄우지 않는다.
+
+```powershell
+docker compose -f docker-compose.local.yml up -d redis
+```
 
 ## GitHub Secrets
 
