@@ -13,6 +13,7 @@ class NginxDeployConfigTest {
 
     private static final Path NGINX_CONFIG = Path.of("deploy/nginx/default.conf");
     private static final Path COMPOSE_CONFIG = Path.of("deploy/docker-compose.yml");
+    private static final Path LOCAL_COMPOSE_CONFIG = Path.of("docker-compose.local.yml");
     private static final Path ENV_EXAMPLE = Path.of("deploy/env.example");
     private static final Path DATADOG_REDIS_CONFIG = Path.of("deploy/datadog/conf.d/redisdb.d/conf.yaml");
     private static final Path DOCKERFILE = Path.of("Dockerfile");
@@ -105,47 +106,87 @@ class NginxDeployConfigTest {
     }
 
     @Test
-    void compose_uses_managed_redis_for_queue_and_does_not_define_docker_redis() {
+    void compose_runs_private_docker_redis_and_queue_uses_single_redis() {
         String compose = read(COMPOSE_CONFIG);
 
         assertThat(compose)
-                .contains("SPRING_DATA_REDIS_CLUSTER_NODES: ${REDIS_CLUSTER_NODES:?REDIS_CLUSTER_NODES is required}")
-                .contains("SPRING_DATA_REDIS_USERNAME: ${REDIS_USERNAME:-default}")
-                .contains("SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}")
-                .contains("SPRING_DATA_REDIS_SSL_ENABLED: ${REDIS_SSL_ENABLED:-true}")
-                .doesNotContain("image: redis:7-alpine")
-                .doesNotContain("container_name: ticket-queue-redis")
-                .doesNotContain("local-redis")
-                .doesNotContain("redis-data")
-                .doesNotContain("SPRING_DATA_REDIS_HOST: redis")
-                .doesNotContain("SPRING_DATA_REDIS_PORT: 6379")
-                .doesNotContain("- redis\n      - datadog-agent");
+                .contains("image: redis:7-alpine")
+                .contains("container_name: ticket-queue-redis")
+                .contains("expose:\n      - \"6379\"")
+                .contains("redis-data:/data")
+                .contains("command: redis-server --appendonly yes")
+                .contains("condition: service_healthy")
+                .contains("SPRING_DATA_REDIS_HOST: redis")
+                .contains("SPRING_DATA_REDIS_PORT: \"6379\"")
+                .contains("redis-data:")
+                .doesNotContain("SPRING_PROFILES_ACTIVE")
+                .doesNotContain("SPRING_DATA_REDIS_CLUSTER_NODES")
+                .doesNotContain("SPRING_DATA_REDIS_USERNAME")
+                .doesNotContain("SPRING_DATA_REDIS_PASSWORD")
+                .doesNotContain("SPRING_DATA_REDIS_SSL_ENABLED")
+                .doesNotContain("\"6379:6379\"")
+                .doesNotContain("ticket-managed-redis");
     }
 
     @Test
-    void datadog_agent_has_managed_redis_integration_config() {
+    void datadog_agent_scrapes_docker_redis_without_managed_auth() {
         String compose = read(COMPOSE_CONFIG);
         String redisIntegration = read(DATADOG_REDIS_CONFIG);
 
         assertThat(compose)
                 .contains("./datadog/conf.d/redisdb.d/conf.yaml:/etc/datadog-agent/conf.d/redisdb.d/conf.yaml:ro")
-                .contains("REDIS_HOST: ${REDIS_HOST:?REDIS_HOST is required}")
-                .contains("REDIS_PORT: ${REDIS_PORT:-10000}")
-                .contains("REDIS_USERNAME: ${REDIS_USERNAME:-default}")
-                .contains("REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}")
-                .doesNotContain("DD_CONTAINER_EXCLUDE_METRICS: name:ticket-queue-redis");
+                .contains("REDIS_HOST: redis")
+                .contains("REDIS_PORT: \"6379\"")
+                .doesNotContain("REDIS_USERNAME")
+                .doesNotContain("REDIS_PASSWORD");
 
         assertThat(redisIntegration)
                 .contains("host: \"%%env_REDIS_HOST%%\"")
                 .contains("port: \"%%env_REDIS_PORT%%\"")
-                .contains("username: \"%%env_REDIS_USERNAME%%\"")
-                .contains("password: \"%%env_REDIS_PASSWORD%%\"")
-                .contains("ssl: true")
-                .contains("service:ticket-managed-redis");
+                .contains("ssl: false")
+                .contains("env:%%env_DD_ENV%%")
+                .contains("service:ticket-queue-redis")
+                .contains("managed:false")
+                .doesNotContain("username:")
+                .doesNotContain("password:")
+                .doesNotContain("ssl: true")
+                .doesNotContain("ticket-managed-redis");
     }
 
     @Test
-    void env_example_documents_datadog_configuration() {
+    void local_compose_runs_only_docker_redis_without_datadog_or_queue_app() {
+        String localCompose = read(LOCAL_COMPOSE_CONFIG);
+
+        assertThat(localCompose)
+                .contains("services:")
+                .contains("redis:")
+                .contains("image: redis:7-alpine")
+                .contains("container_name: ticket-queue-local-redis")
+                .contains("\"6379:6379\"")
+                .contains("redis-data:")
+                .doesNotContain("datadog-agent")
+                .doesNotContain("DD_API_KEY")
+                .doesNotContain("DOCKER_IMAGE")
+                .doesNotContain("SPRING_PROFILES_ACTIVE")
+                .doesNotContain("\n  queue:");
+    }
+
+    @Test
+    void application_uses_single_redis_with_env_overrides() {
+        String application = read(APPLICATION_CONFIG);
+
+        assertThat(application)
+                .contains("host: ${REDIS_HOST:localhost}")
+                .contains("port: ${REDIS_PORT:6379}")
+                .contains("env: ${DD_ENV:local}")
+                .doesNotContain("username: ${REDIS_USERNAME:}")
+                .doesNotContain("password: ${REDIS_PASSWORD:}")
+                .doesNotContain("enabled: ${REDIS_SSL_ENABLED:false}")
+                .doesNotContain("nodes: ${REDIS_CLUSTER_NODES:}");
+    }
+
+    @Test
+    void env_example_documents_datadog_and_application_secrets() {
         String env = read(ENV_EXAMPLE);
 
         assertThat(env)
@@ -153,12 +194,15 @@ class NginxDeployConfigTest {
                 .contains("DD_SITE=us5.datadoghq.com")
                 .contains("DD_ENV=prod")
                 .contains("DD_VERSION=latest")
-                .contains("REDIS_HOST=ticket-managed-redis.southeastasia.redis.azure.net")
-                .contains("REDIS_PORT=10000")
-                .contains("REDIS_CLUSTER_NODES=rediss://ticket-managed-redis.southeastasia.redis.azure.net:10000")
-                .contains("REDIS_USERNAME=default")
-                .contains("REDIS_PASSWORD=replace-with-managed-redis-access-key")
-                .contains("REDIS_SSL_ENABLED=true");
+                .contains("JWT_SECRET=replace-with-core-access-token-secret-32-byte-minimum")
+                .contains("QUEUE_TOKEN_SECRET=replace-with-32-byte-minimum-secret")
+                .contains("ADMISSION_TOKEN_SECRET_KEY=replace-with-32-byte-minimum-secret")
+                .doesNotContain("SPRING_PROFILES_ACTIVE")
+                .doesNotContain("REDIS_CLUSTER_NODES")
+                .doesNotContain("REDIS_USERNAME")
+                .doesNotContain("REDIS_PASSWORD")
+                .doesNotContain("REDIS_SSL_ENABLED")
+                .doesNotContain("ticket-managed-redis");
     }
 
     @Test
