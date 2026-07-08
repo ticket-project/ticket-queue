@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 class NginxDeployConfigTest {
 
     private static final Path NGINX_CONFIG = Path.of("deploy/nginx/default.conf");
+    private static final Path NGINX_MAIN_CONFIG = Path.of("deploy/nginx/nginx.conf");
     private static final Path COMPOSE_CONFIG = Path.of("deploy/docker-compose.yml");
     private static final Path LOCAL_COMPOSE_CONFIG = Path.of("docker-compose.local.yml");
     private static final Path ENV_EXAMPLE = Path.of("deploy/env.example");
@@ -52,12 +53,29 @@ class NginxDeployConfigTest {
     }
 
     @Test
+    void nginx_main_config_raises_worker_and_file_descriptor_limits() {
+        String config = read(NGINX_MAIN_CONFIG);
+
+        assertThat(config)
+                .contains("worker_processes auto;")
+                .contains("worker_rlimit_nofile 65535;")
+                .contains("worker_connections 16384;")
+                .contains("multi_accept on;")
+                .contains("include /etc/nginx/conf.d/*.conf;");
+    }
+
+    @Test
     void compose_does_not_mount_public_state_static_origin() {
         String compose = read(COMPOSE_CONFIG);
 
         assertThat(compose)
+                .contains("./nginx/nginx.conf:/etc/nginx/nginx.conf:ro")
                 .contains("./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro")
                 .contains("\"443:443\"")
+                .contains("ulimits:")
+                .contains("nofile:")
+                .contains("soft: 65535")
+                .contains("hard: 65535")
                 .contains("./certbot/www:/var/www/certbot:ro")
                 .contains("/etc/letsencrypt:/etc/letsencrypt:ro")
                 .doesNotContain("./public-state")
@@ -73,6 +91,7 @@ class NginxDeployConfigTest {
                 .contains("sudo mkdir -p /opt/ticket-queue/certbot/www")
                 .contains("sudo mkdir -p /opt/ticket-queue/datadog/conf.d/redisdb.d")
                 .contains("source: \"deploy/docker-compose.yml\"")
+                .contains("source: \"deploy/nginx/nginx.conf\"")
                 .contains("source: \"deploy/nginx/default.conf\"")
                 .contains("source: \"deploy/datadog/conf.d/redisdb.d/conf.yaml\"")
                 .contains("test -f /etc/letsencrypt/live/queue.oneticket.site/fullchain.pem")
