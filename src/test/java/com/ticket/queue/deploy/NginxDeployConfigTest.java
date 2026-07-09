@@ -139,7 +139,7 @@ class NginxDeployConfigTest {
                 .contains("expose:")
                 .contains("- \"6379\"")
                 .contains("redis-data:/data")
-                .contains("command: redis-server --appendonly yes")
+                .contains("command: redis-server --appendonly no")
                 .contains("condition: service_healthy")
                 .contains("SPRING_DATA_REDIS_HOST: redis")
                 .contains("SPRING_DATA_REDIS_PORT: \"6379\"")
