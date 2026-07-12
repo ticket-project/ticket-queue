@@ -4,10 +4,17 @@ server:
 spring:
   application:
     name: ticket-queue
+  main:
+    banner-mode: "off"
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+
+logging:
+  structured:
+    format:
+      console: logstash
 
 management:
   endpoints:
