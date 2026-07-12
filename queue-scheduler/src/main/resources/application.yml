@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: ticket-queue-scheduler
+  main:
+    web-application-type: none
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+management:
+  metrics:
+    tags:
+      service: ${DD_SERVICE:ticket-queue-scheduler}
+      env: ${DD_ENV:local}
+      version: ${DD_VERSION:local}
+
+app:
+  queue:
+    scheduler-enabled: ${QUEUE_SCHEDULER_ENABLED:true}
+    advance-interval-ms: ${QUEUE_ADVANCE_INTERVAL_MS:1000}

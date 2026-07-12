@@ -8,15 +8,22 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 class QueueCdnCacheArchitectureTest {
 
+    private static final List<Path> MODULE_SOURCE_ROOTS = List.of(
+            Path.of("queue-common/src/main/java/com/ticket/queue"),
+            Path.of("queue-api/src/main/java/com/ticket/queue"),
+            Path.of("queue-scheduler/src/main/java/com/ticket/queue")
+    );
+
     private static final List<Path> STATIC_STATE_FILES = List.of(
-            Path.of("src/main/java/com/ticket/queue/domain/PublicStatePublisher.java"),
-            Path.of("src/main/java/com/ticket/queue/infra/FilePublicStatePublisher.java"),
-            Path.of("src/test/java/com/ticket/queue/infra/FilePublicStatePublisherTest.java")
+            Path.of("queue-common/src/main/java/com/ticket/queue/domain/PublicStatePublisher.java"),
+            Path.of("queue-common/src/main/java/com/ticket/queue/infra/FilePublicStatePublisher.java"),
+            Path.of("queue-common/src/test/java/com/ticket/queue/infra/FilePublicStatePublisherTest.java")
     );
 
     @Test
@@ -27,7 +34,9 @@ class QueueCdnCacheArchitectureTest {
 
     @Test
     void queue_application_code_does_not_reference_static_state_origin() {
-        String code = readAll(Path.of("src/main/java/com/ticket/queue"));
+        String code = MODULE_SOURCE_ROOTS.stream()
+                .map(this::readAll)
+                .collect(Collectors.joining("\n"));
 
         assertThat(code)
                 .doesNotContain("PublicStatePublisher")
