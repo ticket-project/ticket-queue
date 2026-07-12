@@ -110,7 +110,7 @@ Cloudflare 설정 기준은 `docs/cloudflare-state-api-cache.md`에 정리합니
 
 ## Redis Key
 
-join/enter hot path는 Redis Cluster에서 shard별로 분산되도록 `{performanceId:shardId}` hash tag를 사용합니다. public state projection만 회차 단위 `{performanceId}` key를 사용합니다.
+join/enter hot path는 shard별 key를 사용합니다. key 이름에는 `{performanceId:shardId}` hash tag 형태를 유지하고, public state projection만 회차 단위 `{performanceId}` key를 사용합니다.
 
 `/join`은 shard-local counter, user marker, compact ticket, slot tail, pending slot, waiting marker만 갱신합니다. shard state와 public state는 scheduler가 갱신하므로 join hot path에서 public projection write를 하지 않습니다.
 
@@ -177,6 +177,8 @@ advance 이후에는 Redis의 public state가 갱신됩니다. 사용자는 `/st
 로컬 실행 예시:
 
 ```powershell
+docker compose -f docker-compose.local.yml up -d redis
+
 $env:JWT_SECRET="local-access-token-secret-key-32bytes"
 $env:JWT_ISSUER="ticket"
 $env:JWT_ACCESS_TOKEN_EXPIRATION_SECONDS="1800"
@@ -184,6 +186,8 @@ $env:ADMISSION_TOKEN_SECRET_KEY="local-admission-secret-key-32bytes"
 $env:QUEUE_TOKEN_SECRET="local-queue-token-secret-key-32bytes"
 .\gradlew.bat bootRun
 ```
+
+로컬에서 앱을 직접 실행하면 기본값으로 단일 Redis(`localhost:6379`)를 사용하고 Datadog Agent를 띄우지 않는다. 운영 compose는 내부 Docker Redis(`redis:6379`)를 함께 띄우고 Queue Server가 그 Redis에 연결한다.
 
 ## 검증
 
@@ -194,11 +198,11 @@ $env:QUEUE_TOKEN_SECRET="local-queue-token-secret-key-32bytes"
 
 ## Azure VM Deployment
 
-`deploy/` and `.github/workflows/deploy.yml` provide a Docker image based deployment for running only `ticket-queue`, Redis, and Nginx on an Azure VM.
+`deploy/` and `.github/workflows/deploy.yml` provide a Docker image based deployment for running `ticket-queue`, Nginx, Redis, and Datadog Agent on an Azure VM. Redis는 compose 내부 service로 띄우며 외부 포트는 publish하지 않는다.
 
 ```text
-client -> Cloudflare cached /api/v1/queue/performances/*/state -> nginx -> ticket-queue -> Redis
-client -> Cloudflare bypass/no-store /api/v1/queue/** -> nginx -> ticket-queue -> Redis
+client -> Cloudflare cached /api/v1/queue/performances/*/state -> nginx -> ticket-queue -> Docker Redis
+client -> Cloudflare bypass/no-store /api/v1/queue/** -> nginx -> ticket-queue -> Docker Redis
 ```
 
 Real secrets stay in `/opt/ticket-queue/.env` on the VM. GitHub Actions builds and pushes the Docker image, uploads the nginx config to the VM, then runs `docker compose up -d --remove-orphans` with the server-owned Compose file.

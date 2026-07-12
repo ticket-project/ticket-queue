@@ -54,5 +54,6 @@ redis.call('PEXPIRE', KEYS[4], ttl_millis)
 redis.call('ZADD', KEYS[5], slot_id, tostring(slot_id))
 redis.call('PEXPIRE', KEYS[5], ttl_millis)
 
-redis.call('SET', KEYS[6], '1', 'PX', marker_ttl_millis)
-return {queue_id, local_seq, slot_id, slot_start_millis, 1, 1}
+local marker_created = redis.call('SET', KEYS[6], '1', 'NX', 'PX', marker_ttl_millis)
+local register_waiting_performance = marker_created and 1 or 0
+return {queue_id, local_seq, slot_id, slot_start_millis, 1, register_waiting_performance}

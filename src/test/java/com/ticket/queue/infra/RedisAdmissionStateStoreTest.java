@@ -45,7 +45,9 @@ class RedisAdmissionStateStoreTest {
         assertThat(script).contains("redis.call('PEXPIRE', KEYS[1], ttl_millis)");
         assertThat(script).contains("redis.call('SET', KEYS[3], ticket_value, 'PX', ttl_millis)");
         assertThat(script).contains("local marker_ttl_millis = tonumber(ARGV[6])");
-        assertThat(script).contains("redis.call('SET', KEYS[6], '1', 'PX', marker_ttl_millis)");
+        assertThat(script).contains("local marker_created = redis.call('SET', KEYS[6], '1', 'NX', 'PX', marker_ttl_millis)");
+        assertThat(script).contains("local register_waiting_performance = marker_created and 1 or 0");
+        assertThat(script).contains("return {queue_id, local_seq, slot_id, slot_start_millis, 1, register_waiting_performance}");
     }
 
     @Test
@@ -152,7 +154,7 @@ class RedisAdmissionStateStoreTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void joinQueue_registers_scheduler_work_for_each_new_queue_entry() {
+    void joinQueue_skips_scheduler_registration_when_shard_marker_already_exists() {
         RedissonClient redissonClient = mock(RedissonClient.class);
         RScript script = mock(RScript.class);
         RSet<String> waitingPerformanceSet = mock(RSet.class);
@@ -168,7 +170,7 @@ class RedisAdmissionStateStoreTest {
                 eq(RScript.ReturnType.LIST),
                 any(List.class),
                 any(Object[].class)
-        )).thenReturn(List.of("queue-1", 42L, 24_691L, 1_234_550L, 1L, 1L));
+        )).thenReturn(List.of("queue-1", 42L, 24_691L, 1_234_550L, 1L, 0L));
 
         JoinResult actual = store.joinQueue(
                 1L,
@@ -179,7 +181,7 @@ class RedisAdmissionStateStoreTest {
         );
 
         assertThat(actual.created()).isTrue();
-        verify(waitingPerformanceSet).add("1");
+        verify(waitingPerformanceSet, never()).add("1");
     }
 
     @Test

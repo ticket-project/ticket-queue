@@ -3,10 +3,9 @@ init_config:
 instances:
   - host: "%%env_REDIS_HOST%%"
     port: "%%env_REDIS_PORT%%"
-    username: "%%env_REDIS_USERNAME%%"
-    password: "%%env_REDIS_PASSWORD%%"
-    ssl: true
+    ssl: false
     tags:
-      - service:ticket-managed-redis
+      - env:%%env_DD_ENV%%
+      - service:ticket-queue-redis
       - component:queue-redis
-      - managed:true
+      - managed:false
