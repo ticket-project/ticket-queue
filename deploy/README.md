@@ -3,8 +3,9 @@
 `ticket-queue`는 GitHub Actions에서 Docker 이미지를 빌드하고 Docker Hub에 push한 뒤, Azure VM에서 이미지를 pull해 Docker Compose로 재기동한다.
 
 ```text
-client -> Cloudflare cached /api/v1/queue/performances/*/state -> nginx -> ticket-queue -> Redis
-client -> Cloudflare bypass/no-store /api/v1/queue/** -> nginx -> ticket-queue -> Redis
+client -> Cloudflare cached /api/v1/queue/performances/*/state -> nginx -> ticket-queue(API) -> Redis
+client -> Cloudflare bypass/no-store /api/v1/queue/** -> nginx -> ticket-queue(API) -> Redis
+ticket-queue-scheduler(백그라운드, 웹 경로 아님) -> Redis
 ```
 
 ## VM Setup
@@ -53,7 +54,7 @@ deploy/datadog/conf.d/redisdb.d/conf.yaml -> /opt/ticket-queue/datadog/conf.d/re
 
 Datadog 설정과 Docker Redis 연결값은 `deploy/docker-compose.yml`에서 관리한다.
 
-운영 compose는 내부 전용 Redis service를 함께 띄운다. Queue Server는 별도 Spring profile 없이 compose 네트워크 안에서 `redis:6379` 단일 Redis에 연결하고, Redis `6379` 포트는 외부에 publish하지 않는다. Datadog Redis integration은 `DD_ENV`를 `env` 태그로 붙여 운영/로컬 모니터링이 섞이지 않게 한다.
+운영 compose는 내부 전용 Redis service를 함께 띄운다. Queue API(`queue`)와 Scheduler(`scheduler`)는 별도 Spring profile 없이 compose 네트워크 안에서 `redis:6379` 단일 Redis에 함께 연결하고, Redis `6379` 포트는 외부에 publish하지 않는다. Scheduler는 웹 서버 없이(`web-application-type: none`) 큐 입장 전진만 담당하므로 포트를 열지 않는다. Datadog Redis integration은 `DD_ENV`를 `env` 태그로 붙여 운영/로컬 모니터링이 섞이지 않게 한다.
 
 로컬 Redis가 필요하면 repository root에서 아래 명령만 실행한다. 이 compose 파일은 Redis 컨테이너만 제공하고 Datadog Agent나 Queue Server를 띄우지 않는다.
 
@@ -85,10 +86,10 @@ Workflow는 `master` push에서 실행되고, GitHub Actions에서 수동 실행
 ```text
 master push
 -> ./gradlew test bootJar
--> docker build
--> docker push {DOCKER_USERNAME}/ticket-queue:latest
+-> docker build (queue-api, queue-scheduler)
+-> docker push {DOCKER_USERNAME}/ticket-queue-api:latest, {DOCKER_USERNAME}/ticket-queue-scheduler:latest
 -> ssh Azure VM
--> docker pull
+-> docker pull (두 이미지)
 -> VM의 /opt/ticket-queue/docker-compose.yml로 docker compose up -d --remove-orphans
 ```
 

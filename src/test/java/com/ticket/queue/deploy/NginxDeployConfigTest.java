@@ -7,6 +7,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class NginxDeployConfigTest {
@@ -17,7 +18,8 @@ class NginxDeployConfigTest {
     private static final Path LOCAL_COMPOSE_CONFIG = Path.of("docker-compose.local.yml");
     private static final Path ENV_EXAMPLE = Path.of("deploy/env.example");
     private static final Path DATADOG_REDIS_CONFIG = Path.of("deploy/datadog/conf.d/redisdb.d/conf.yaml");
-    private static final Path DOCKERFILE = Path.of("Dockerfile");
+    private static final Path API_DOCKERFILE = Path.of("queue-api/Dockerfile");
+    private static final Path SCHEDULER_DOCKERFILE = Path.of("queue-scheduler/Dockerfile");
     private static final Path DEPLOY_WORKFLOW = Path.of(".github/workflows/deploy.yml");
     private static final Path APPLICATION_CONFIG = Path.of("queue-api/src/main/resources/application.yml");
 
@@ -104,13 +106,46 @@ class NginxDeployConfigTest {
     }
 
     @Test
-    void docker_image_packages_datadog_java_agent() {
-        String dockerfile = read(DOCKERFILE);
+    void docker_images_package_datadog_java_agent() {
+        for (Path dockerfile : List.of(API_DOCKERFILE, SCHEDULER_DOCKERFILE)) {
+            assertThat(read(dockerfile))
+                    .as("dockerfile %s", dockerfile)
+                    .contains("ARG DD_JAVA_AGENT_VERSION=")
+                    .contains("/opt/datadog/dd-java-agent.jar")
+                    .contains("COPY build/libs/*.jar app.jar");
+        }
+    }
 
-        assertThat(dockerfile)
-                .contains("ARG DD_JAVA_AGENT_VERSION=")
-                .contains("/opt/datadog/dd-java-agent.jar")
-                .contains("COPY build/libs/*.jar app.jar");
+    @Test
+    void api_image_exposes_web_port_and_scheduler_image_is_headless() {
+        assertThat(read(API_DOCKERFILE)).contains("EXPOSE 8090");
+        assertThat(read(SCHEDULER_DOCKERFILE)).doesNotContain("EXPOSE");
+    }
+
+    @Test
+    void compose_runs_dedicated_scheduler_sharing_single_redis() {
+        String compose = read(COMPOSE_CONFIG);
+
+        assertThat(compose)
+                .contains("scheduler:")
+                .contains("${SCHEDULER_DOCKER_IMAGE")
+                .contains("container_name: ticket-queue-scheduler")
+                .contains("DD_SERVICE: ticket-queue-scheduler")
+                .contains("SPRING_DATA_REDIS_HOST: redis");
+    }
+
+    @Test
+    void deploy_workflow_builds_and_deploys_api_and_scheduler_images() {
+        String workflow = read(DEPLOY_WORKFLOW);
+
+        assertThat(workflow)
+                .contains("ticket-queue-api:latest")
+                .contains("ticket-queue-scheduler:latest")
+                .contains("context: ./queue-api")
+                .contains("context: ./queue-scheduler")
+                .contains("SCHEDULER_DOCKER_IMAGE=")
+                .doesNotContain("ticket-queue:latest")
+                .doesNotContain("file: ./Dockerfile");
     }
 
     @Test

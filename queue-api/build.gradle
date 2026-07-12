@@ -41,6 +41,12 @@ tasks.withType(JavaCompile).configureEach {
     options.compilerArgs += '-parameters'
 }
 
+// Only the executable bootJar is deployed; skip the plain library jar so the
+// Dockerfile's `COPY build/libs/*.jar` matches exactly one artifact.
+tasks.named('jar') {
+    enabled = false
+}
+
 tasks.named('test') {
     useJUnitPlatform()
 }

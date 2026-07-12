@@ -42,15 +42,25 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push Docker image
+      - name: Build and push queue-api image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./queue-api
+          file: ./queue-api/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/ticket-queue:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ secrets.DOCKER_USERNAME }}/ticket-queue-api:latest
+          cache-from: type=gha,scope=queue-api
+          cache-to: type=gha,mode=max,scope=queue-api
+
+      - name: Build and push queue-scheduler image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./queue-scheduler
+          file: ./queue-scheduler/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/ticket-queue-scheduler:latest
+          cache-from: type=gha,scope=queue-scheduler
+          cache-to: type=gha,mode=max,scope=queue-scheduler
 
       - name: Prepare deploy directory
         uses: appleboy/ssh-action@v1.2.0
@@ -122,7 +132,8 @@ jobs:
           port: ${{ secrets.AZURE_VM_PORT || '22' }}
           script: |
             set -e
-            IMAGE="${{ secrets.DOCKER_USERNAME }}/ticket-queue:latest"
+            API_IMAGE="${{ secrets.DOCKER_USERNAME }}/ticket-queue-api:latest"
+            SCHEDULER_IMAGE="${{ secrets.DOCKER_USERNAME }}/ticket-queue-scheduler:latest"
             DEPLOY_DIR="/opt/ticket-queue"
 
             cd "$DEPLOY_DIR"
@@ -131,6 +142,7 @@ jobs:
             sudo test -f /etc/letsencrypt/live/queue.oneticket.site/fullchain.pem || { echo "missing TLS certificate: /etc/letsencrypt/live/queue.oneticket.site/fullchain.pem"; exit 1; }
             sudo test -f /etc/letsencrypt/live/queue.oneticket.site/privkey.pem || { echo "missing TLS private key: /etc/letsencrypt/live/queue.oneticket.site/privkey.pem"; exit 1; }
             echo "${{ secrets.DOCKER_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-            sudo docker pull "$IMAGE"
-            sudo DOCKER_IMAGE="$IMAGE" docker compose -f docker-compose.yml up -d --remove-orphans
+            sudo docker pull "$API_IMAGE"
+            sudo docker pull "$SCHEDULER_IMAGE"
+            sudo DOCKER_IMAGE="$API_IMAGE" SCHEDULER_DOCKER_IMAGE="$SCHEDULER_IMAGE" docker compose -f docker-compose.yml up -d --remove-orphans
             sudo docker image prune -f

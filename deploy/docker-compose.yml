@@ -48,6 +48,36 @@ services:
       com.datadoghq.ad.checks: >-
         {"openmetrics":{"init_config":{},"instances":[{"openmetrics_endpoint":"http://%%host%%:8090/actuator/prometheus","namespace":"ticket_queue","metrics":[".*"]}]}}
 
+  scheduler:
+    image: ${SCHEDULER_DOCKER_IMAGE:?SCHEDULER_DOCKER_IMAGE is required}
+    container_name: ticket-queue-scheduler
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      datadog-agent:
+        condition: service_started
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      JAVA_TOOL_OPTIONS: -javaagent:/opt/datadog/dd-java-agent.jar
+      DD_AGENT_HOST: datadog-agent
+      DD_SERVICE: ticket-queue-scheduler
+      DD_ENV: ${DD_ENV:-prod}
+      DD_SITE: ${DD_SITE:-us5.datadoghq.com}
+      DD_VERSION: ${DD_VERSION:-latest}
+      DD_LOGS_INJECTION: "true"
+      DD_RUNTIME_METRICS_ENABLED: "true"
+    labels:
+      com.datadoghq.tags.service: ticket-queue-scheduler
+      com.datadoghq.tags.env: ${DD_ENV:-prod}
+      com.datadoghq.tags.version: ${DD_VERSION:-latest}
+      com.datadoghq.ad.logs: >-
+        [{"source":"java","service":"ticket-queue-scheduler"}]
+
   nginx:
     image: nginx:1.27-alpine
     container_name: ticket-queue-nginx
