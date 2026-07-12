@@ -15,3 +15,7 @@ pluginManagement {
 }
 
 rootProject.name = 'ticket-queue'
+
+include 'queue-common'
+include 'queue-api'
+include 'queue-scheduler'

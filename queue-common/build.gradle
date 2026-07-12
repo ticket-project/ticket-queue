@@ -1,0 +1,44 @@
+plugins {
+    id 'java-library'
+    id 'io.spring.dependency-management'
+}
+
+// queue-common is a plain library (NOT a Spring Boot application): it holds the
+// shared queue/Redis contract consumed by both queue-api and queue-scheduler.
+// No bootJar is produced here.
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.boot:spring-boot-dependencies:${property('springBootVersion')}"
+    }
+}
+
+dependencies {
+    // Exposed to consumers: the shared @ConfigurationProperties / @Configuration
+    // beans and the Redis store are Spring components that queue-api and
+    // queue-scheduler instantiate via component scanning.
+    api 'org.springframework.boot:spring-boot-starter'
+    api 'org.springframework.boot:spring-boot-starter-validation'
+    api 'org.redisson:redisson-spring-boot-starter:4.2.0'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += '-parameters'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
