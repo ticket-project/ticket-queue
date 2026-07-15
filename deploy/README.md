@@ -3,9 +3,11 @@
 `ticket-queue`는 GitHub Actions에서 Docker 이미지를 빌드하고 Docker Hub에 push한 뒤, Azure VM에서 이미지를 pull해 Docker Compose로 재기동한다.
 
 ```text
-client -> Cloudflare cached /api/v1/queue/performances/*/state -> nginx -> ticket-queue -> Redis
-client -> Cloudflare bypass/no-store /api/v1/queue/** -> nginx -> ticket-queue -> Redis
+client -> nginx -> /api/v1/queue/**/join, /enter -> ticket-queue -> Redis
+client -> Cloudflare state endpoint -> cached /api/v1/queue/performances/*/state -> nginx -> ticket-queue -> Redis
 ```
+
+`/join`과 `/enter`는 Cloudflare를 거치지 않고 Queue origin Nginx로 직접 들어온다. Cloudflare는 별도로 구성한 public state endpoint의 `/state` 조회에만 선택적으로 사용한다. 같은 DNS-only hostname을 Queue API와 state가 함께 사용하면 `/state`도 Cloudflare를 거치지 않는다.
 
 ## VM Setup
 
@@ -112,7 +114,7 @@ Cache-Control: no-store
 X-Content-Type-Options: nosniff
 ```
 
-Cloudflare Cache Rule은 `/api/v1/queue/performances/*/state` GET 요청만 cache eligible로 두고, Edge TTL은 Cloudflare 설정에서 강제한다. 반복 요청에서 아래 값이 보이면 Cloudflare edge cache가 적용된 것이다.
+state 전용 Cloudflare endpoint의 Cache Rule은 `/api/v1/queue/performances/*/state` GET 요청만 cache eligible로 두고, Edge TTL은 Cloudflare 설정에서 강제한다. `/join`과 `/enter`에는 이 규칙을 적용하지 않는다. state endpoint에 반복 요청했을 때 아래 값이 보이면 Cloudflare edge cache가 적용된 것이다.
 
 ```text
 cf-cache-status: HIT

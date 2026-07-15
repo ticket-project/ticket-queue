@@ -1,4 +1,10 @@
 server:
+  tomcat:
+    max-connections: 16384
+    accept-count: 1000
+    threads:
+      max: 300
+      min-spare: 50
   port: 8090
 
 spring:
