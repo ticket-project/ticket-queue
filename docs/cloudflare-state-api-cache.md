@@ -5,18 +5,36 @@
 ## 목표 구조
 
 ```text
-User
-  -> Cloudflare
-     -> /api/v1/queue/performances/*/state 5 second edge cache
-     -> /api/v1/queue/**/join no cache, rate limit
-     -> /api/v1/queue/**/enter no cache, rate limit
-  -> Nginx origin
-     -> /api/v1/queue/** no-store proxy
-  -> ticket-queue
-  -> Redis
+Join/Enter write path
+  User
+    -> Nginx origin
+       -> /api/v1/queue/**/join, /enter no-store proxy
+    -> ticket-queue
+    -> Redis
+
+Public state read path
+  User
+    -> Cloudflare state endpoint
+       -> /api/v1/queue/performances/*/state 1-5 second edge cache
+    -> Nginx origin
+       -> /api/v1/queue/** no-store proxy
+    -> ticket-queue
+    -> Redis
 ```
 
 `/state` 응답은 사용자별 정보를 포함하지 않아야 한다. `Authorization`, cookie, query string 없이 모든 사용자가 같은 응답을 공유한다.
+
+`/join`과 `/enter`는 Cloudflare를 거치지 않는다. 두 요청은 Queue API endpoint를 통해 Nginx origin으로 직접 들어온다. Cloudflare DNS proxy는 hostname 단위로 적용되므로, `/state`만 Cloudflare에 태우려면 Queue API origin과 state endpoint를 서로 다른 hostname 또는 별도 CDN/static endpoint로 분리해야 한다.
+
+```text
+Queue API endpoint
+  -> DNS-only/direct origin
+  -> /join, /enter
+
+Queue state endpoint
+  -> Cloudflare proxied
+  -> /state
+```
 
 ## Nginx
 
@@ -52,7 +70,7 @@ Cache Rule:
 
 ```text
 조건:
-  hostname equals queue.oneticket.site
+  hostname equals <Cloudflare가 프록시하는 state 전용 hostname>
   uri path starts with /api/v1/queue/performances/
   uri path ends with /state
   request method equals GET
@@ -65,14 +83,14 @@ Cache Rule:
   custom cache key: query string 제외
 ```
 
-`/api/v1/queue/**/join`, `/api/v1/queue/**/enter`는 캐시 금지와 rate limit 대상이다.
+`/api/v1/queue/**/join`, `/api/v1/queue/**/enter`는 이 Cloudflare endpoint를 사용하지 않는다. 해당 경로의 rate limit과 접근 제어가 필요하면 Queue origin의 Nginx, 애플리케이션 또는 별도 인프라 계층에서 구성한다.
 
 ## Frontend
 
 대기 화면은 아래 URL을 조회한다.
 
 ```text
-https://queue.oneticket.site/api/v1/queue/performances/{performanceId}/state
+https://<state-endpoint>/api/v1/queue/performances/{performanceId}/state
 ```
 
 fetch 조건:
@@ -88,8 +106,8 @@ Cookie 의존 없음
 기능 확인:
 
 ```bash
-curl -I https://queue.oneticket.site/api/v1/queue/performances/1/state
-curl https://queue.oneticket.site/api/v1/queue/performances/1/state
+curl -I https://<state-endpoint>/api/v1/queue/performances/1/state
+curl https://<state-endpoint>/api/v1/queue/performances/1/state
 ```
 
 Cloudflare 확인:
