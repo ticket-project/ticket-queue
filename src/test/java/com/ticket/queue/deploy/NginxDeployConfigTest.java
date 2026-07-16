@@ -246,6 +246,16 @@ class NginxDeployConfigTest {
                 .contains("version: ${DD_VERSION:local}");
     }
 
+    @Test
+    void application_enables_tomcat_mbean_metrics_for_prometheus() {
+        String application = read(APPLICATION_CONFIG);
+
+        assertThat(application)
+                .contains("tomcat:")
+                .contains("mbeanregistry:")
+                .contains("enabled: true");
+    }
+
     private String read(final Path path) {
         try {
             return Files.readString(path, StandardCharsets.UTF_8);
