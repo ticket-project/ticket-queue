@@ -1,5 +1,7 @@
 server:
   tomcat:
+    mbeanregistry:
+      enabled: true
     max-connections: 16384
     accept-count: 1000
     threads:
