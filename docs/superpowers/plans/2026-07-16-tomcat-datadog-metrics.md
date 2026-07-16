@@ -8,19 +8,19 @@
 
 ---
 
-### Task 1: 설정과 회귀 테스트
+## Task 1: 설정과 회귀 테스트
 
 - `src/main/resources/application.yml`에서 `server.tomcat.mbeanregistry.enabled=true`를 유지한다.
 - `NginxDeployConfigTest`에 설정 존재 여부를 검증하는 테스트를 추가한다.
 - 대상 테스트와 전체 테스트를 실행하고 `bootJar`를 생성한다.
 
-### Task 2: 배포와 원본 지표 검증
+## Task 2: 배포와 원본 지표 검증
 
 - 현재 저장소의 배포 경로와 권한을 확인한다.
 - 변경 버전을 대상 VM에 배포하고 컨테이너를 재시작한다.
 - `/actuator/prometheus`에서 `tomcat_threads_*`, `tomcat_connections_*` 시계열과 태그를 확인한다.
 
-### Task 3: Datadog 대시보드
+## Task 3: Datadog 대시보드
 
 - Datadog에서 실제 변환된 `ticket_queue.tomcat_*` 메트릭명을 조회한다.
 - busy/current/max threads와 current/max connections 위젯을 기존 부하 테스트 그룹에 추가한다.

@@ -251,9 +251,7 @@ class NginxDeployConfigTest {
         String application = read(APPLICATION_CONFIG);
 
         assertThat(application)
-                .contains("tomcat:")
-                .contains("mbeanregistry:")
-                .contains("enabled: true");
+                .containsPattern("(?m)^server:\\R  tomcat:\\R    mbeanregistry:\\R      enabled: true$");
     }
 
     private String read(final Path path) {
