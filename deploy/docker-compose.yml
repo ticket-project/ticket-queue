@@ -37,8 +37,8 @@ services:
       DD_VERSION: ${DD_VERSION:-latest}
       DD_LOGS_INJECTION: "true"
       DD_RUNTIME_METRICS_ENABLED: "true"
-    expose:
-      - "8090"
+    ports:
+      - "8090:8090"
     labels:
       com.datadoghq.tags.service: ticket-queue
       com.datadoghq.tags.env: ${DD_ENV:-prod}
