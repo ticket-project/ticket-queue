@@ -12,7 +12,7 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    environment: azure-queue
+    environment: aws-queue
     permissions:
       contents: read
       packages: read
@@ -55,75 +55,77 @@ jobs:
       - name: Prepare deploy directory
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.AZURE_VM_HOST }}
-          username: ${{ secrets.AZURE_VM_USER }}
-          key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          port: ${{ secrets.AZURE_VM_PORT || '22' }}
+          host: ${{ secrets.AWS_VM_HOST }}
+          username: ${{ secrets.AWS_VM_USER }}
+          key: ${{ secrets.AWS_VM_SSH_KEY }}
+          port: ${{ secrets.AWS_VM_PORT || '22' }}
           script: |
             set -e
-            sudo mkdir -p /opt/ticket-queue/nginx
-            sudo mkdir -p /opt/ticket-queue/certbot/www
-            sudo mkdir -p /opt/ticket-queue/datadog/conf.d/redisdb.d
-            sudo chown -R "$USER:$USER" /opt/ticket-queue
+            sudo mkdir -p /home/ubuntu/datadog-agent/run
+            sudo chown -R "$USER:$USER" /home/ubuntu/datadog-agent
+            sudo mkdir -p /home/ubuntu/ticket-queue/nginx
+            sudo mkdir -p /home/ubuntu/ticket-queue/certbot/www
+            sudo mkdir -p /home/ubuntu/ticket-queue/datadog/conf.d/redisdb.d
+            sudo chown -R "$USER:$USER" /home/ubuntu/ticket-queue
 
       - name: Upload docker compose config
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.AZURE_VM_HOST }}
-          username: ${{ secrets.AZURE_VM_USER }}
-          key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          port: ${{ secrets.AZURE_VM_PORT || '22' }}
+          host: ${{ secrets.AWS_VM_HOST }}
+          username: ${{ secrets.AWS_VM_USER }}
+          key: ${{ secrets.AWS_VM_SSH_KEY }}
+          port: ${{ secrets.AWS_VM_PORT || '22' }}
           source: "deploy/docker-compose.yml"
-          target: "/opt/ticket-queue"
+          target: "/home/ubuntu/ticket-queue"
           strip_components: 1
           overwrite: true
 
       - name: Upload nginx main config
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.AZURE_VM_HOST }}
-          username: ${{ secrets.AZURE_VM_USER }}
-          key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          port: ${{ secrets.AZURE_VM_PORT || '22' }}
+          host: ${{ secrets.AWS_VM_HOST }}
+          username: ${{ secrets.AWS_VM_USER }}
+          key: ${{ secrets.AWS_VM_SSH_KEY }}
+          port: ${{ secrets.AWS_VM_PORT || '22' }}
           source: "deploy/nginx/nginx.conf"
-          target: "/opt/ticket-queue"
+          target: "/home/ubuntu/ticket-queue"
           strip_components: 1
           overwrite: true
       - name: Upload nginx config
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.AZURE_VM_HOST }}
-          username: ${{ secrets.AZURE_VM_USER }}
-          key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          port: ${{ secrets.AZURE_VM_PORT || '22' }}
+          host: ${{ secrets.AWS_VM_HOST }}
+          username: ${{ secrets.AWS_VM_USER }}
+          key: ${{ secrets.AWS_VM_SSH_KEY }}
+          port: ${{ secrets.AWS_VM_PORT || '22' }}
           source: "deploy/nginx/default.conf"
-          target: "/opt/ticket-queue"
+          target: "/home/ubuntu/ticket-queue"
           strip_components: 1
           overwrite: true
 
       - name: Upload Datadog Redis config
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.AZURE_VM_HOST }}
-          username: ${{ secrets.AZURE_VM_USER }}
-          key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          port: ${{ secrets.AZURE_VM_PORT || '22' }}
+          host: ${{ secrets.AWS_VM_HOST }}
+          username: ${{ secrets.AWS_VM_USER }}
+          key: ${{ secrets.AWS_VM_SSH_KEY }}
+          port: ${{ secrets.AWS_VM_PORT || '22' }}
           source: "deploy/datadog/conf.d/redisdb.d/conf.yaml"
-          target: "/opt/ticket-queue"
+          target: "/home/ubuntu/ticket-queue"
           strip_components: 1
           overwrite: true
 
-      - name: Deploy to Azure VM
+      - name: Deploy to AWS EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.AZURE_VM_HOST }}
-          username: ${{ secrets.AZURE_VM_USER }}
-          key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          port: ${{ secrets.AZURE_VM_PORT || '22' }}
+          host: ${{ secrets.AWS_VM_HOST }}
+          username: ${{ secrets.AWS_VM_USER }}
+          key: ${{ secrets.AWS_VM_SSH_KEY }}
+          port: ${{ secrets.AWS_VM_PORT || '22' }}
           script: |
             set -e
             IMAGE="${{ secrets.DOCKER_USERNAME }}/ticket-queue:latest"
-            DEPLOY_DIR="/opt/ticket-queue"
+            DEPLOY_DIR="/home/ubuntu/ticket-queue"
 
             cd "$DEPLOY_DIR"
             test -f .env

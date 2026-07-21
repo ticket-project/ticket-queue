@@ -91,7 +91,7 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /proc:/host/proc:ro
       - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
-      - /opt/datadog-agent/run:/opt/datadog-agent/run:rw
+      - /home/ubuntu/datadog-agent/run:/opt/datadog-agent/run:rw
       - ./datadog/conf.d/redisdb.d/conf.yaml:/etc/datadog-agent/conf.d/redisdb.d/conf.yaml:ro
 
 volumes:

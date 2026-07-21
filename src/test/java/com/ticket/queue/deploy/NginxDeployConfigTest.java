@@ -94,19 +94,29 @@ class NginxDeployConfigTest {
     }
 
     @Test
-    void deploy_workflow_does_not_prepare_static_public_state_directory() {
+    void deploy_workflow_targets_aws_home_directory_without_static_public_state_directory() {
         String workflow = read(DEPLOY_WORKFLOW);
 
         assertThat(workflow)
-                .contains("sudo mkdir -p /opt/ticket-queue/nginx")
-                .contains("sudo mkdir -p /opt/ticket-queue/certbot/www")
-                .contains("sudo mkdir -p /opt/ticket-queue/datadog/conf.d/redisdb.d")
+                .contains("environment: aws-queue")
+                .contains("secrets.AWS_VM_HOST")
+                .contains("secrets.AWS_VM_USER")
+                .contains("secrets.AWS_VM_SSH_KEY")
+                .contains("secrets.AWS_VM_PORT")
+                .contains("sudo mkdir -p /home/ubuntu/datadog-agent/run")
+                .contains("sudo mkdir -p /home/ubuntu/ticket-queue/nginx")
+                .contains("sudo mkdir -p /home/ubuntu/ticket-queue/certbot/www")
+                .contains("sudo mkdir -p /home/ubuntu/ticket-queue/datadog/conf.d/redisdb.d")
+                .contains("DEPLOY_DIR=\"/home/ubuntu/ticket-queue\"")
                 .contains("source: \"deploy/docker-compose.yml\"")
                 .contains("source: \"deploy/nginx/nginx.conf\"")
                 .contains("source: \"deploy/nginx/default.conf\"")
                 .contains("source: \"deploy/datadog/conf.d/redisdb.d/conf.yaml\"")
                 .contains("test -f /etc/letsencrypt/live/queue.oneticket.site/fullchain.pem")
                 .contains("test -f /etc/letsencrypt/live/queue.oneticket.site/privkey.pem")
+                .doesNotContain("/opt/ticket-queue")
+                .doesNotContain("AZURE_VM")
+                .doesNotContain("azure-queue")
                 .doesNotContain("public-state")
                 .doesNotContain("queue-state");
     }
@@ -131,6 +141,7 @@ class NginxDeployConfigTest {
                 .contains("DD_SERVICE: ticket-queue")
                 .contains("DD_ENV: ${DD_ENV:-prod}")
                 .contains("DD_SITE: ${DD_SITE:-us5.datadoghq.com}")
+                .contains("/home/ubuntu/datadog-agent/run:/opt/datadog-agent/run:rw")
                 .contains("DD_APM_ENABLED: \"true\"")
                 .contains("DD_LOGS_ENABLED: \"true\"")
                 .contains("DD_RUNTIME_METRICS_ENABLED: \"true\"")
