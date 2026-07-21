@@ -196,9 +196,9 @@ $env:QUEUE_TOKEN_SECRET="local-queue-token-secret-key-32bytes"
 .\gradlew.bat bootJar
 ```
 
-## Azure VM Deployment
+## AWS EC2 Deployment
 
-`deploy/` and `.github/workflows/deploy.yml` provide a Docker image based deployment for running `ticket-queue`, Nginx, Redis, and Datadog Agent on an Azure VM. Redis는 compose 내부 service로 띄우며 외부 포트는 publish하지 않는다.
+`deploy/` and `.github/workflows/deploy.yml` provide a Docker image based deployment for running `ticket-queue`, Nginx, Redis, and Datadog Agent on AWS EC2. Redis는 compose 내부 service로 띄우며 외부 포트는 publish하지 않는다.
 
 ```text
 client -> nginx -> /api/v1/queue/**/join, /enter -> ticket-queue -> Docker Redis
@@ -207,9 +207,9 @@ client -> Cloudflare state endpoint -> cached /api/v1/queue/performances/*/state
 
 `/join`과 `/enter`는 Cloudflare 경로가 아니다. Cloudflare 캐시는 public `/state` 조회에만 선택적으로 사용하며, 이를 적용하려면 직접 origin인 Queue API endpoint와 Cloudflare가 프록시하는 state endpoint를 분리해야 한다. Queue API와 state가 같은 DNS-only hostname을 사용하면 `/state`도 Cloudflare를 거치지 않는다.
 
-Real secrets stay in `/opt/ticket-queue/.env` on the VM. GitHub Actions builds and pushes the Docker image, uploads the nginx config to the VM, then runs `docker compose up -d --remove-orphans` with the server-owned Compose file.
+Real secrets stay in `/home/ubuntu/ticket-queue/.env` on the EC2 instance. GitHub Actions builds and pushes the Docker image, uploads the nginx config to the EC2 instance, then runs `docker compose up -d --remove-orphans` with the server-owned Compose file.
 
-See `deploy/README.md` for VM setup and required GitHub Secrets.
+See `deploy/README.md` for EC2 setup and required GitHub Secrets.
 
 ## 남은 운영 검증
 
