@@ -1,8 +1,15 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   redis:
     image: redis:7-alpine
     container_name: ticket-queue-redis
     restart: unless-stopped
+    logging: *default-logging
     expose:
       - "6379"
     volumes:
@@ -18,6 +25,7 @@ services:
     image: ${DOCKER_IMAGE:?DOCKER_IMAGE is required}
     container_name: ticket-queue
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       redis:
         condition: service_healthy
@@ -52,6 +60,7 @@ services:
     image: nginx:1.27-alpine
     container_name: ticket-queue-nginx
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       - queue
     ports:
@@ -71,6 +80,7 @@ services:
     image: gcr.io/datadoghq/agent:latest
     container_name: datadog-agent
     restart: unless-stopped
+    logging: *default-logging
     pid: host
     cgroup: host
     environment:
