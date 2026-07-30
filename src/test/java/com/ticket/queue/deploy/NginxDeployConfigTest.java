@@ -19,7 +19,7 @@ class NginxDeployConfigTest {
     private static final Path DATADOG_REDIS_CONFIG = Path.of("deploy/datadog/conf.d/redisdb.d/conf.yaml");
     private static final Path DOCKERFILE = Path.of("Dockerfile");
     private static final Path DEPLOY_WORKFLOW = Path.of(".github/workflows/deploy.yml");
-    private static final Path APPLICATION_CONFIG = Path.of("src/main/resources/application.yml");
+    private static final Path APPLICATION_CONFIG = Path.of("queue-api/src/main/resources/application.yml");
 
     @Test
     void proxies_queue_api_without_static_state_cache() {
@@ -260,7 +260,7 @@ class NginxDeployConfigTest {
                 .contains("include: health,info,prometheus")
                 .contains("metrics:")
                 .contains("tags:")
-                .contains("service: ${DD_SERVICE:ticket-queue}")
+                .contains("service: ${DD_SERVICE:ticket-queue-api}")
                 .contains("env: ${DD_ENV:local}")
                 .contains("version: ${DD_VERSION:local}");
     }
