@@ -1,17 +1,23 @@
-# Queue AWS EC2 Deployment
+# Queue AWS EC2 배포
 
-`ticket-queue`는 GitHub Actions에서 Docker 이미지를 빌드하고 Docker Hub에 push한 뒤, AWS EC2에서 이미지를 pull해 Docker Compose로 재기동한다.
+이 배포는 `queue-api`와 `queue-scheduler`를 별도 Docker 이미지와 별도 프로세스로 실행합니다. 두 프로세스는 같은 Redis를 사용하지만 역할과 확장 단위가 다릅니다.
 
 ```text
-client -> nginx -> /api/v1/queue/**/join, /enter -> ticket-queue -> Redis
-client -> Cloudflare state endpoint -> cached /api/v1/queue/performances/*/state -> nginx -> ticket-queue -> Redis
+client -> nginx -> queue-api ----------+
+                                        +-> Redis
+                    queue-scheduler ----+
 ```
 
-`/join`과 `/enter`는 Cloudflare를 거치지 않고 Queue origin Nginx로 직접 들어온다. Cloudflare는 별도로 구성한 public state endpoint의 `/state` 조회에만 선택적으로 사용한다. 같은 DNS-only hostname을 Queue API와 state가 함께 사용하면 `/state`도 Cloudflare를 거치지 않는다.
+- `queue-api`: `8090`을 Nginx에 제공하며 외부 요청을 처리합니다.
+- `queue-scheduler`: 외부 요청을 받지 않습니다. 내부 헬스/메트릭용 `8091`만 Compose 네트워크에 노출합니다.
+- `redis`: 현재 EC2 Compose에서 실행합니다. ECS 전환 시 두 서비스가 같은 managed Redis endpoint를 보도록 변경합니다.
+- `datadog-agent`: 두 애플리케이션을 서로 다른 service tag로 수집합니다.
 
-## EC2 Setup
+`/join`과 `/enter`는 Queue origin Nginx로 직접 요청합니다. Cloudflare 캐시는 public `/state` 조회에만 선택적으로 사용하며 자세한 규칙은 `docs/cloudflare-state-api-cache.md`를 참고합니다.
 
-EC2에 Docker와 Compose plugin을 설치하고 배포 디렉터리를 만든다.
+## EC2 준비
+
+EC2에 Docker와 Compose plugin을 설치하고 배포 디렉터리를 만듭니다.
 
 ```bash
 sudo systemctl stop nginx || true
@@ -28,20 +34,18 @@ sudo mkdir -p /home/ubuntu/ticket-queue/datadog/conf.d/redisdb.d
 sudo chown -R "$USER:$USER" /home/ubuntu/ticket-queue
 ```
 
-GitHub Actions가 root가 아닌 사용자로 SSH 접속한다면 해당 사용자는 passwordless sudo로 `docker`를 실행할 수 있어야 한다.
+GitHub Actions가 root가 아닌 사용자로 SSH 접속한다면 해당 사용자는 passwordless sudo로 `docker`를 실행할 수 있어야 합니다.
 
-Cloudflare SSL/TLS Full (Strict) 모드를 유지하려면 origin nginx도 443 HTTPS를 제공해야 한다. EC2에는 Let's Encrypt 또는 Cloudflare Origin Certificate를 아래 경로에 준비한다. 인증서와 private key는 커밋하지 않는다.
+Cloudflare SSL/TLS Full (Strict) 모드를 사용하려면 origin 인증서를 다음 경로에 준비합니다.
 
 ```text
 /etc/letsencrypt/live/queue.oneticket.site/fullchain.pem
 /etc/letsencrypt/live/queue.oneticket.site/privkey.pem
 ```
 
-Certbot HTTP-01 webroot를 사용할 때는 `/home/ubuntu/ticket-queue/certbot/www`를 challenge root로 사용한다.
+## 서버 파일과 환경변수
 
-## GitHub Actions 업로드 파일
-
-GitHub Actions는 배포 시 아래 파일을 EC2의 `/home/ubuntu/ticket-queue` 아래로 업로드하고 덮어쓴다. 런타임 secret은 계속 EC2의 `/home/ubuntu/ticket-queue/.env`에만 둔다.
+Actions가 다음 파일을 `/home/ubuntu/ticket-queue` 아래에 업로드합니다. 실제 secret은 업로드하지 않고 서버의 `.env`에만 둡니다.
 
 ```text
 deploy/docker-compose.yml -> /home/ubuntu/ticket-queue/docker-compose.yml
@@ -50,17 +54,19 @@ deploy/nginx/default.conf -> /home/ubuntu/ticket-queue/nginx/default.conf
 deploy/datadog/conf.d/redisdb.d/conf.yaml -> /home/ubuntu/ticket-queue/datadog/conf.d/redisdb.d/conf.yaml
 ```
 
-따라서 Datadog Agent, `JAVA_TOOL_OPTIONS`, 운영 Docker Redis 연결 설정은 repository의 `deploy/docker-compose.yml`과 Datadog 설정 파일에서 관리한다. 운영 secret 값은 `.env`에만 둔다. 로컬 개발용 `docker-compose.local.yml`은 EC2에 업로드하지 않는다.
+`deploy/env.example`을 기준으로 `.env`를 만듭니다.
 
-## Environment
+API 전용 secret은 `JWT_SECRET`, `QUEUE_TOKEN_SECRET`, `ADMISSION_TOKEN_SECRET_KEY`, `QUEUE_COMPLETION_SECRET`입니다. Compose의 `queue` 서비스만 `.env` 전체를 읽고, `scheduler` 서비스에는 이 값들을 전달하지 않습니다. 스케줄러에는 Redis 주소, 입장 정책, 실행 간격, 관측 설정만 전달합니다. 이 경계를 유지하는 이유는 스케줄러 침해 시 API 서명 키까지 노출되는 것을 막기 위해서입니다.
 
-`deploy/env.example`을 기준으로 EC2에 `/home/ubuntu/ticket-queue/.env`를 만들고 애플리케이션 secret 값을 교체한다. 실제 `.env`는 커밋하지 않는다.
+주요 스케줄러 환경변수:
 
-Datadog 설정과 Docker Redis 연결값은 `deploy/docker-compose.yml`에서 관리한다.
+```text
+QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE=5000
+QUEUE_MAX_ADMIT_PER_SECOND_PER_PERFORMANCE=500
+QUEUE_ADVANCE_INTERVAL_MS=1000
+```
 
-운영 compose는 내부 전용 Redis service를 함께 띄운다. Queue Server는 별도 Spring profile 없이 compose 네트워크 안에서 `redis:6379` 단일 Redis에 연결하고, Redis `6379` 포트는 외부에 publish하지 않는다. Datadog Redis integration은 `DD_ENV`를 `env` 태그로 붙여 운영/로컬 모니터링이 섞이지 않게 한다.
-
-로컬 Redis가 필요하면 repository root에서 아래 명령만 실행한다. 이 compose 파일은 Redis 컨테이너만 제공하고 Datadog Agent나 Queue Server를 띄우지 않는다.
+로컬 Redis만 실행하려면 저장소 루트에서 다음 명령을 사용합니다.
 
 ```powershell
 docker compose -f docker-compose.local.yml up -d redis
@@ -68,7 +74,7 @@ docker compose -f docker-compose.local.yml up -d redis
 
 ## GitHub Secrets
 
-GitHub repository 또는 `aws-queue` environment에 아래 secret을 설정한다.
+GitHub repository의 `aws-queue` environment에 다음 secret을 설정합니다.
 
 ```text
 DOCKER_USERNAME
@@ -79,48 +85,60 @@ AWS_VM_SSH_KEY
 AWS_VM_PORT
 ```
 
-SSH가 22 포트를 쓰면 `AWS_VM_PORT`는 생략할 수 있다.
+`AWS_VM_PORT`는 SSH가 22번 포트를 사용한다면 생략할 수 있습니다.
 
 Queue Server는 외부 GitHub Packages를 읽지 않는다. EC2 `.env`에는 Core access token 검증용 `JWT_SECRET`, `JWT_ISSUER`, `JWT_ACCESS_TOKEN_EXPIRATION_SECONDS`, queue/admission token secret, Core와 공유하는 `QUEUE_COMPLETION_SECRET`, 측정된 입장률·active·burst 한도를 설정한다.
 
 Workflow는 `master` push에서 실행되고, GitHub Actions에서 수동 실행도 가능하다.
 
-## Deploy Flow
+## 배포 흐름
 
 ```text
 master push
--> ./gradlew test bootJar
--> docker build
--> docker push {DOCKER_USERNAME}/ticket-queue:latest
--> ssh AWS EC2
--> docker pull
--> EC2의 /home/ubuntu/ticket-queue/docker-compose.yml로 docker compose up -d --remove-orphans
+-> root/API/scheduler/Redis 모듈 테스트
+-> queue-api.jar + queue-scheduler.jar 생성
+-> ticket-queue-api:{commit SHA} 이미지 push
+-> ticket-queue-scheduler:{commit SHA} 이미지 push
+-> EC2에서 두 SHA 이미지 pull
+-> 같은 SHA의 두 이미지를 docker compose up -d로 교체
 ```
 
-## Verify
+`latest` 태그도 발행하지만 실제 배포에는 커밋 SHA 태그를 사용합니다. 왜냐하면 한쪽 이미지만 새 버전으로 바뀌면 Redis key/Lua 규약이 어긋날 수 있기 때문입니다.
 
-배포 후 EC2에서 확인한다.
+## 확인
 
 ```bash
 cd /home/ubuntu/ticket-queue
 sudo docker compose ps
-sudo ss -lntp | grep -E ':80|:443'
+sudo docker compose logs --tail=100 queue scheduler
+sudo ss -lntp | grep -E ':80|:443|:8090'
 curl -I http://localhost/api/v1/queue/performances/1/state
 curl -k -I https://localhost/api/v1/queue/performances/1/state
-curl -I https://queue.oneticket.site/api/v1/queue/performances/1/state
 ```
 
-origin 응답은 아래 헤더를 포함해야 한다.
+스케줄러의 `8091`은 호스트에 publish하지 않으므로 외부에서 접근되지 않아야 합니다. 컨테이너 내부 상태는 다음처럼 확인할 수 있습니다.
+
+```bash
+sudo docker compose exec scheduler wget -qO- http://localhost:8091/actuator/health
+```
+
+origin `/state` 응답에는 다음 헤더가 있어야 합니다.
 
 ```text
 Cache-Control: no-store
 X-Content-Type-Options: nosniff
 ```
 
-state 전용 Cloudflare endpoint의 Cache Rule은 `/api/v1/queue/performances/*/state` GET 요청만 cache eligible로 두고, Edge TTL은 Cloudflare 설정에서 강제한다. `/join`과 `/enter`에는 이 규칙을 적용하지 않는다. state endpoint에 반복 요청했을 때 아래 값이 보이면 Cloudflare edge cache가 적용된 것이다.
+AWS security group은 `22`, `80`, `443`만 엽니다. Redis `6379`, API `8090`, 스케줄러 `8091`은 직접 외부에 노출하지 않습니다.
 
-```text
-cf-cache-status: HIT
-```
+## ECS 전환 시
 
-AWS security group은 `22`, `80`, `443`만 연다. Redis `6379`와 queue `8090`은 직접 외부에 열지 않는다.
+현재 모듈과 이미지는 그대로 사용하고 인프라만 다음처럼 바꾸면 됩니다.
+
+- `queue-api`: ECS service, 요청량 기준 독립 오토스케일링
+- `queue-scheduler`: 별도 ECS service, 기본 1 task에서 시작
+- Redis: ElastiCache 같은 managed Redis로 교체
+- 두 ECS service에 동일한 Redis endpoint와 동일한 배포 SHA 사용
+- scheduler security group은 Redis와 관측 경로만 허용
+
+여러 scheduler task를 실행할 수는 있지만 처리량이 task 수만큼 선형 증가하지는 않습니다. 회차별 Redis 분산 락이 중복 전진을 막기 때문에, 우선 1 task로 운영하고 가용성이나 서로 다른 회차 병렬 처리 필요가 확인될 때 늘리는 편이 안전합니다.

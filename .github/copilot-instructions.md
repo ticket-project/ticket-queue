@@ -21,11 +21,13 @@
 
 - 대기열 상태 전이와 admission token 발급/검증
 - Redis key naming, TTL, 만료 처리, Lua script 로딩
+- Gradle 모듈 경계: `queue-api`와 `queue-scheduler`는 서로 의존하지 않고 `queue-redis`만 공유
 - scheduler, admission advance, public state API 조회 흐름
+- API와 scheduler의 별도 Docker 이미지, 같은 커밋 SHA 배포, scheduler secret 최소화
 - Cloudflare state API cache, nginx, docker-compose, 운영 환경 변수
 - 공개 API와 내부 인증 경계
 
 ## 권장 검증
 
-- 빠른 검증: `./gradlew test`
-- 회귀 확인: `./gradlew test --rerun-tasks`
+- 빠른 검증: `./gradlew test :queue-redis:test :queue-api:test :queue-scheduler:test`
+- 패키징 확인: `./gradlew :queue-api:bootJar :queue-scheduler:bootJar`
