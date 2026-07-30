@@ -1,5 +1,7 @@
 # Tomcat Datadog Metrics Implementation Plan
 
+> 상태 메모(2026-07-30): 저장소 안의 MBean 설정과 회귀 테스트(Task 1)는 반영되어 있습니다. 배포 환경의 실제 지표 확인과 Datadog 대시보드 구성(Task 2~3)은 외부 상태를 확인해야 하므로, 이 계획 문서만으로 완료됐다고 판단하면 안 됩니다.
+
 **Goal:** Tomcat connection/thread metrics를 Prometheus와 Datadog에서 수집하고 기존 부하 테스트 대시보드에 직접 확인할 수 있는 위젯을 추가한다.
 
 **Approach:** Spring Boot의 Tomcat MBean registry를 활성화하고 설정 회귀 테스트를 추가한다. 애플리케이션을 배포한 뒤 `/actuator/prometheus`의 실제 지표명을 기준으로 Datadog OpenMetrics 이름을 확인하고 대시보드 위젯을 생성한다.
