@@ -22,8 +22,8 @@ services:
       retries: 10
 
   queue:
-    image: ${DOCKER_IMAGE:?DOCKER_IMAGE is required}
-    container_name: ticket-queue
+    image: ${QUEUE_API_DOCKER_IMAGE:?QUEUE_API_DOCKER_IMAGE is required}
+    container_name: ticket-queue-api
     restart: unless-stopped
     logging: *default-logging
     depends_on:
@@ -39,7 +39,7 @@ services:
       SPRING_DATA_REDIS_PORT: "6379"
       JAVA_TOOL_OPTIONS: -javaagent:/opt/datadog/dd-java-agent.jar
       DD_AGENT_HOST: datadog-agent
-      DD_SERVICE: ticket-queue
+      DD_SERVICE: ticket-queue-api
       DD_ENV: ${DD_ENV:-prod}
       DD_SITE: ${DD_SITE:-us5.datadoghq.com}
       DD_VERSION: ${DD_VERSION:-latest}
@@ -48,13 +48,48 @@ services:
     ports:
       - "8090:8090"
     labels:
-      com.datadoghq.tags.service: ticket-queue
+      com.datadoghq.tags.service: ticket-queue-api
       com.datadoghq.tags.env: ${DD_ENV:-prod}
       com.datadoghq.tags.version: ${DD_VERSION:-latest}
       com.datadoghq.ad.logs: >-
-        [{"source":"java","service":"ticket-queue"}]
+        [{"source":"java","service":"ticket-queue-api"}]
       com.datadoghq.ad.checks: >-
-        {"openmetrics":{"init_config":{},"instances":[{"openmetrics_endpoint":"http://%%host%%:8090/actuator/prometheus","namespace":"ticket_queue","metrics":[".*"]}]}}
+        {"openmetrics":{"init_config":{},"instances":[{"openmetrics_endpoint":"http://%%host%%:8090/actuator/prometheus","namespace":"ticket_queue_api","metrics":[".*"]}]}}
+
+  scheduler:
+    image: ${QUEUE_SCHEDULER_DOCKER_IMAGE:?QUEUE_SCHEDULER_DOCKER_IMAGE is required}
+    container_name: ticket-queue-scheduler
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      redis:
+        condition: service_healthy
+      datadog-agent:
+        condition: service_started
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE: ${QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE:-5000}
+      QUEUE_MAX_ADMIT_PER_SECOND_PER_PERFORMANCE: ${QUEUE_MAX_ADMIT_PER_SECOND_PER_PERFORMANCE:-500}
+      QUEUE_ADVANCE_INTERVAL_MS: ${QUEUE_ADVANCE_INTERVAL_MS:-1000}
+      JAVA_TOOL_OPTIONS: -javaagent:/opt/datadog/dd-java-agent.jar
+      DD_AGENT_HOST: datadog-agent
+      DD_SERVICE: ticket-queue-scheduler
+      DD_ENV: ${DD_ENV:-prod}
+      DD_SITE: ${DD_SITE:-us5.datadoghq.com}
+      DD_VERSION: ${DD_VERSION:-latest}
+      DD_LOGS_INJECTION: "true"
+      DD_RUNTIME_METRICS_ENABLED: "true"
+    expose:
+      - "8091"
+    labels:
+      com.datadoghq.tags.service: ticket-queue-scheduler
+      com.datadoghq.tags.env: ${DD_ENV:-prod}
+      com.datadoghq.tags.version: ${DD_VERSION:-latest}
+      com.datadoghq.ad.logs: >-
+        [{"source":"java","service":"ticket-queue-scheduler"}]
+      com.datadoghq.ad.checks: >-
+        {"openmetrics":{"init_config":{},"instances":[{"openmetrics_endpoint":"http://%%host%%:8091/actuator/prometheus","namespace":"ticket_queue_scheduler","metrics":[".*"]}]}}
 
   nginx:
     image: nginx:1.27-alpine
