@@ -2,6 +2,24 @@
 
 Redis 기반 대기열 서버입니다. 목표는 인기 회차 오픈 시 Ticket Server로 직접 트래픽이 몰리지 않도록, 사용자를 대기열에 세우고 입장 가능한 사용자에게만 admission token을 발급하는 것입니다.
 
+## 멀티모듈과 실행 프로세스
+
+하나의 저장소에서 Redis 규약을 공유하되 API와 스케줄러는 서로 다른 Spring Boot 애플리케이션과 Docker 이미지로 배포합니다.
+
+```text
+queue-api       HTTP API, 인증, queue/admission token, API용 Redis 명령
+queue-scheduler 상시 스케줄링, 입장 인원 계산, public state 갱신
+queue-redis     Redis key, Lua script, Redisson 설정만 공유하는 얇은 라이브러리
+```
+
+API를 여러 ECS task로 늘려도 스케줄러 수와 함께 늘어나지 않습니다. 스케줄러도 별도 ECS service로 배포할 수 있으며, 여러 task를 실행하더라도 Redis 분산 락으로 같은 회차의 동시 전진을 막습니다. 두 애플리케이션은 같은 Redis와 같은 커밋에서 만들어진 이미지를 사용해야 합니다.
+
+```text
+client -> nginx -> queue-api -----------+
+                                         +-> Redis
+                     queue-scheduler ----+
+```
+
 ## 핵심 구조
 
 기존 사용자별 status polling 방식은 제거했습니다. 현재 흐름은 public state 방식입니다.
@@ -181,8 +199,7 @@ advance 이후에는 Redis의 public state가 갱신됩니다. 사용자는 `/st
 | `app.queue.slot-size-millis` | `50` | 공정성 time slot 크기 |
 | `app.queue.slot-close-grace-millis` | `200` | slot 확정 전 대기 grace |
 | `app.queue.join-poll-after-ms` | `1000` | join 응답 후 state 재조회 권장 간격 |
-| `app.queue.scheduler-enabled` | `true` | scheduler 활성화 여부 |
-| `app.queue.advance-interval-ms` | `1000` | scheduler 실행 간격(ms) |
+| `app.queue.advance-interval-ms` | `1000` | scheduler 실행 간격(ms), scheduler 모듈 전용 |
 | `app.queue.redirect.ticketing-url-template` | `/booking/seat?performanceId={performanceId}` | 입장 후 redirect URL |
 
 | 환경변수 | 기본값 | 설명 |
@@ -200,6 +217,7 @@ advance 이후에는 Redis의 public state가 갱신됩니다. 사용자는 `/st
 | `JWT_SECRET` | 없음 | Core access token 검증용 JWT secret, 32바이트 이상 |
 | `JWT_ISSUER` | `ticket` | Core access token issuer |
 | `JWT_ACCESS_TOKEN_EXPIRATION_SECONDS` | `1800` | Core access token expiration seconds |
+| `QUEUE_ADVANCE_INTERVAL_MS` | `1000` | scheduler 실행 간격(ms) |
 
 로컬 실행 예시:
 
@@ -213,30 +231,38 @@ $env:ADMISSION_TOKEN_SECRET_KEY="local-admission-secret-key-32bytes"
 $env:QUEUE_TOKEN_SECRET="local-queue-token-secret-key-32bytes"
 $env:QUEUE_COMPLETION_ENABLED="true"
 $env:QUEUE_COMPLETION_SECRET="local-queue-completion-secret-key-32bytes"
-.\gradlew.bat bootRun
+
+# 터미널 1: API
+.\gradlew.bat :queue-api:bootRun
+
+# 터미널 2: 상시 스케줄러
+.\gradlew.bat :queue-scheduler:bootRun
 ```
 
-로컬에서 앱을 직접 실행하면 기본값으로 단일 Redis(`localhost:6379`)를 사용하고 Datadog Agent를 띄우지 않는다. 운영 compose는 내부 Docker Redis(`redis:6379`)를 함께 띄우고 Queue Server가 그 Redis에 연결한다.
+로컬에서 두 프로세스를 직접 실행하면 기본값으로 같은 Redis(`localhost:6379`)를 사용하고 Datadog Agent는 띄우지 않습니다. 운영 compose는 현재 내부 Docker Redis(`redis:6379`)를 함께 띄우며, ECS 전환 시 두 서비스의 Redis 주소를 같은 managed Redis endpoint로 바꾸면 됩니다.
 
-## 검증
+## 검증과 패키징
 
 ```powershell
-.\gradlew.bat test
-.\gradlew.bat bootJar
+.\gradlew.bat clean test :queue-redis:test :queue-api:test :queue-scheduler:test
+.\gradlew.bat :queue-api:bootJar :queue-scheduler:bootJar
 ```
+
+결과물은 각각 `queue-api/build/libs/queue-api.jar`, `queue-scheduler/build/libs/queue-scheduler.jar`입니다.
 
 ## AWS EC2 Deployment
 
-`deploy/` and `.github/workflows/deploy.yml` provide a Docker image based deployment for running `ticket-queue`, Nginx, Redis, and Datadog Agent on AWS EC2. Redis는 compose 내부 service로 띄우며 외부 포트는 publish하지 않는다.
+`deploy/` and `.github/workflows/deploy.yml` provide a two-image deployment for running `ticket-queue-api`, `ticket-queue-scheduler`, Nginx, Redis, and Datadog Agent on AWS EC2. Redis는 compose 내부 service로 띄우며 외부 포트는 publish하지 않는다.
 
 ```text
-client -> nginx -> /api/v1/queue/**/join, /enter -> ticket-queue -> Docker Redis
-client -> Cloudflare state endpoint -> cached /api/v1/queue/performances/*/state -> nginx -> ticket-queue -> Docker Redis
+client -> nginx -> /api/v1/queue/**/join, /enter -> ticket-queue-api -> Docker Redis
+client -> Cloudflare state endpoint -> cached /api/v1/queue/performances/*/state -> nginx -> ticket-queue-api -> Docker Redis
+queue-scheduler -> Docker Redis
 ```
 
 `/join`과 `/enter`는 Cloudflare 경로가 아니다. Cloudflare 캐시는 public `/state` 조회에만 선택적으로 사용하며, 이를 적용하려면 직접 origin인 Queue API endpoint와 Cloudflare가 프록시하는 state endpoint를 분리해야 한다. Queue API와 state가 같은 DNS-only hostname을 사용하면 `/state`도 Cloudflare를 거치지 않는다.
 
-Real secrets stay in `/home/ubuntu/ticket-queue/.env` on the EC2 instance. GitHub Actions builds and pushes the Docker image, uploads the nginx config to the EC2 instance, then runs `docker compose up -d --remove-orphans` with the server-owned Compose file.
+Real secrets stay in `/home/ubuntu/ticket-queue/.env` on the EC2 instance. GitHub Actions builds and pushes both images with the same commit SHA, uploads the nginx config to the EC2 instance, then runs `docker compose up -d --remove-orphans` with the server-owned Compose file.
 
 See `deploy/README.md` for EC2 setup and required GitHub Secrets.
 

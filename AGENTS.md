@@ -21,9 +21,14 @@
 
 ## 프로젝트 경계
 
-`ticket-queue`는 단일 Spring Boot/Gradle 프로젝트다. 이전 멀티모듈 구조를 사용하지 않는다.
+`ticket-queue`는 한 저장소 안의 Gradle 멀티모듈 프로젝트다. API와 scheduler는 별도 Spring Boot 애플리케이션·Docker 이미지로 실행하고, Redis 규약만 얇은 라이브러리로 공유한다.
 
-패키지 경계는 다음과 같이 유지한다.
+- `queue-api`: join/state/enter HTTP API, 인증, queue/admission token, API용 Redis 명령
+- `queue-scheduler`: 상시 scheduler, 입장 인원 계산, public state 갱신, scheduler용 Redis 명령
+- `queue-redis`: Redis key, Lua script, Redisson 설정 같은 공통 인프라 규약
+- root project: 배포 구조와 저장소 전체 규칙을 검증하는 테스트
+
+`queue-api`는 `queue-scheduler`에 의존하지 않고, `queue-scheduler`도 `queue-api`에 의존하지 않는다. 두 실행 모듈은 `queue-redis`에만 의존한다. API 인증 secret을 scheduler 설정이나 컨테이너에 전달하지 않는다.
 
 - `com.ticket.queue.api`: join/state/enter 및 내부 session 완료 HTTP API와 응답 DTO
 - `com.ticket.queue.application`: use case, public state 조회, scheduler, admission 응답 조립
@@ -49,8 +54,8 @@ Queue Server는 Ticket Server의 좌석 선택, hold, 주문, refresh token Redi
 작업 범위에 맞는 가장 좁은 명령부터 실행한다.
 
 ```powershell
-.\gradlew.bat test
-.\gradlew.bat bootJar
+.\gradlew.bat clean test :queue-redis:test :queue-api:test :queue-scheduler:test
+.\gradlew.bat :queue-api:bootJar :queue-scheduler:bootJar
 ```
 
 문서만 변경한 경우 Java 빌드 대신 아래를 우선한다.
