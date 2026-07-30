@@ -1,0 +1,45 @@
+server:
+  tomcat:
+    mbeanregistry:
+      enabled: true
+    max-connections: 16384
+    accept-count: 1000
+    threads:
+      max: 300
+      min-spare: 50
+  port: 8090
+
+spring:
+  application:
+    name: ticket-queue-api
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      service: ${DD_SERVICE:ticket-queue-api}
+      env: ${DD_ENV:local}
+      version: ${DD_VERSION:local}
+
+security:
+  jwt:
+    issuer: ${JWT_ISSUER:ticket}
+    secret-key: ${JWT_SECRET}
+    access-token-expiration-seconds: ${JWT_ACCESS_TOKEN_EXPIRATION_SECONDS:1800}
+  admission:
+    secret-key: ${ADMISSION_TOKEN_SECRET_KEY}
+
+app:
+  queue:
+    queue-token-secret: ${QUEUE_TOKEN_SECRET}
