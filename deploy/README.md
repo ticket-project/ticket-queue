@@ -81,7 +81,7 @@ AWS_VM_PORT
 
 SSH가 22 포트를 쓰면 `AWS_VM_PORT`는 생략할 수 있다.
 
-Queue Server는 외부 GitHub Packages를 읽지 않는다. EC2 `.env`에는 Core access token 검증용 `JWT_SECRET`, `JWT_ISSUER`, `JWT_ACCESS_TOKEN_EXPIRATION_SECONDS`와 queue/admission token secret을 설정한다.
+Queue Server는 외부 GitHub Packages를 읽지 않는다. EC2 `.env`에는 Core access token 검증용 `JWT_SECRET`, `JWT_ISSUER`, `JWT_ACCESS_TOKEN_EXPIRATION_SECONDS`, queue/admission token secret, Core와 공유하는 `QUEUE_COMPLETION_SECRET`, 측정된 입장률·active·burst 한도를 설정한다.
 
 Workflow는 `master` push에서 실행되고, GitHub Actions에서 수동 실행도 가능하다.
 

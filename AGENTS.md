@@ -25,24 +25,24 @@
 
 패키지 경계는 다음과 같이 유지한다.
 
-- `com.ticket.queue.api`: join/state/enter HTTP API와 응답 DTO
-- `com.ticket.queue.application`: use case, status 조회, scheduler, admission 응답 조립
+- `com.ticket.queue.api`: join/state/enter 및 내부 session 완료 HTTP API와 응답 DTO
+- `com.ticket.queue.application`: use case, public state 조회, scheduler, admission 응답 조립
 - `com.ticket.queue.config`: app.queue와 admission token 설정
 - `com.ticket.queue.domain`: queue model과 port
-- `com.ticket.queue.infra`: Redis/Redisson 저장소, distributed lock AOP, signed admission token 발급 구현
+- `com.ticket.queue.infra`: Redis Lua/Redisson 저장소, 직접 획득하는 advance lock, signed admission token 발급 구현
 
 Queue Server는 Ticket Server의 좌석 선택, hold, 주문, refresh token Redis에 접근하지 않는다.
 
 ## 고위험 영역
 
-- waiting/active 전환은 TTL, 중복 진입, 순번 계산, tick당 승격 수와 함께 검증한다.
-- queue session 만료는 queue entry 만료와 동일하지 않다.
+- scheduler의 shard별 serving sequence 전진과 `enter`의 active session 등록은 별도 단계이므로 둘의 제한값을 함께 검증한다.
+- queue ticket TTL(`defaultQueueTtl`)과 예매 가능 session TTL(`shoppingSessionTtl`)은 목적이 다르다.
 - admission token secret, issuer, audience는 Ticket Server 설정과 일치해야 한다.
-- `activeTtl`은 active member TTL이자 Ticket Server 예매 API 사용 가능 TTL이다.
+- 회차별·전역 active session/rate/burst 제한은 Lua에서 함께 갱신되며, 내부 완료 API는 공유 secret 검증 후 session을 조기 해제한다.
 - Queue Server의 `state`는 공개 API라 access token/header를 요구하지 않고, `enter`는 `X-Queue-Token`만 검증한다.
 - `/state` polling은 Cloudflare/nginx 캐시 경유를 전제로 하며, `join`/`enter`는 캐시하지 않는다.
-- `enter`에서 active 응답을 받은 뒤 클라이언트는 Ticket Server 예매 흐름으로 이동한다.
-- Redis Cluster 운영을 고려해 key naming과 자료구조 변경은 신중하게 검토한다.
+- `enter` 성공 응답을 받은 뒤 클라이언트는 admission token을 들고 Ticket Server 예매 흐름으로 이동한다.
+- 현재 배포는 단일 Redis다. Redis Cluster를 고려한 hash tag를 바꿀 때는 shard key뿐 아니라 원자 갱신되는 `{admission}` session/rate key의 slot도 함께 검토한다.
 
 ## 검증
 
