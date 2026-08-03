@@ -70,6 +70,7 @@ class NginxDeployConfigTest {
                 .contains("env_file:")
                 .contains("\"8090:8090\"")
                 .contains("DD_SERVICE: ticket-queue-api");
+        assertCommonQueuePolicyEnvironment(api);
 
         assertThat(scheduler)
                 .contains("image: ${QUEUE_SCHEDULER_DOCKER_IMAGE:?QUEUE_SCHEDULER_DOCKER_IMAGE is required}")
@@ -84,6 +85,7 @@ class NginxDeployConfigTest {
                 .doesNotContain("JWT_SECRET")
                 .doesNotContain("QUEUE_TOKEN_SECRET")
                 .doesNotContain("ADMISSION_TOKEN_SECRET_KEY");
+        assertCommonQueuePolicyEnvironment(scheduler);
 
         assertThat(compose)
                 .contains("./nginx/nginx.conf:/etc/nginx/nginx.conf:ro")
@@ -177,6 +179,7 @@ class NginxDeployConfigTest {
                 .contains("secret-key: ${JWT_SECRET}")
                 .contains("secret-key: ${ADMISSION_TOKEN_SECRET_KEY}")
                 .contains("queue-token-secret: ${QUEUE_TOKEN_SECRET}");
+        assertCommonQueuePolicyBindings(api);
 
         assertThat(scheduler)
                 .contains("port: 8091")
@@ -186,6 +189,7 @@ class NginxDeployConfigTest {
                 .doesNotContain("JWT_SECRET")
                 .doesNotContain("ADMISSION_TOKEN_SECRET_KEY")
                 .doesNotContain("QUEUE_TOKEN_SECRET");
+        assertCommonQueuePolicyBindings(scheduler);
     }
 
     @Test
@@ -197,6 +201,11 @@ class NginxDeployConfigTest {
                 .contains("QUEUE_SCHEDULER_DOCKER_IMAGE=your-dockerhub-user/ticket-queue-scheduler:latest")
                 .contains("QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE=5000")
                 .contains("QUEUE_MAX_ADMIT_PER_SECOND_PER_PERFORMANCE=500")
+                .contains("QUEUE_DEFAULT_QUEUE_TTL=24h")
+                .contains("QUEUE_DEFAULT_REFRESH_AFTER_MS=5000")
+                .contains("QUEUE_SHARD_COUNT=128")
+                .contains("QUEUE_SLOT_SIZE_MILLIS=50")
+                .contains("QUEUE_SLOT_CLOSE_GRACE_MILLIS=200")
                 .contains("QUEUE_ADVANCE_INTERVAL_MS=1000")
                 .contains("JWT_SECRET=replace-with-core-access-token-secret-32-byte-minimum")
                 .contains("QUEUE_TOKEN_SECRET=replace-with-32-byte-minimum-secret")
@@ -238,6 +247,26 @@ class NginxDeployConfigTest {
                 .doesNotContain("QUEUE_SCHEDULER_DOCKER_IMAGE")
                 .doesNotContain("\n  queue:")
                 .doesNotContain("\n  scheduler:");
+    }
+
+    private void assertCommonQueuePolicyEnvironment(final String service) {
+        assertThat(service)
+                .contains("QUEUE_DEFAULT_QUEUE_TTL: ${QUEUE_DEFAULT_QUEUE_TTL:-24h}")
+                .contains("QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE: ${QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE:-5000}")
+                .contains("QUEUE_DEFAULT_REFRESH_AFTER_MS: ${QUEUE_DEFAULT_REFRESH_AFTER_MS:-5000}")
+                .contains("QUEUE_SHARD_COUNT: ${QUEUE_SHARD_COUNT:-128}")
+                .contains("QUEUE_SLOT_SIZE_MILLIS: ${QUEUE_SLOT_SIZE_MILLIS:-50}")
+                .contains("QUEUE_SLOT_CLOSE_GRACE_MILLIS: ${QUEUE_SLOT_CLOSE_GRACE_MILLIS:-200}");
+    }
+
+    private void assertCommonQueuePolicyBindings(final String config) {
+        assertThat(config)
+                .contains("default-queue-ttl: ${QUEUE_DEFAULT_QUEUE_TTL:24h}")
+                .contains("default-max-active-sessions: ${QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE:5000}")
+                .contains("default-refresh-after-ms: ${QUEUE_DEFAULT_REFRESH_AFTER_MS:5000}")
+                .contains("shard-count: ${QUEUE_SHARD_COUNT:128}")
+                .contains("slot-size-millis: ${QUEUE_SLOT_SIZE_MILLIS:50}")
+                .contains("slot-close-grace-millis: ${QUEUE_SLOT_CLOSE_GRACE_MILLIS:200}");
     }
 
     private String serviceSection(final String compose, final String service, final String nextService) {

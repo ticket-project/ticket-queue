@@ -42,4 +42,10 @@ security:
 
 app:
   queue:
+    default-queue-ttl: ${QUEUE_DEFAULT_QUEUE_TTL:24h}
+    default-max-active-sessions: ${QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE:5000}
+    default-refresh-after-ms: ${QUEUE_DEFAULT_REFRESH_AFTER_MS:5000}
+    shard-count: ${QUEUE_SHARD_COUNT:128}
+    slot-size-millis: ${QUEUE_SLOT_SIZE_MILLIS:50}
+    slot-close-grace-millis: ${QUEUE_SLOT_CLOSE_GRACE_MILLIS:200}
     queue-token-secret: ${QUEUE_TOKEN_SECRET}
