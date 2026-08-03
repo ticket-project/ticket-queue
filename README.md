@@ -39,14 +39,11 @@ client -> nginx -> queue-api -----------+
    내 shardId의 localSeq <= serving[shardId] 이면 enter를 호출합니다.
 
 5. Frontend -> Queue Server enter
-   queueToken 검증 후 전역/회차별 입장률과 active session 한도를 원자적으로 검사합니다.
-   한도 안이면 admissionToken을 받고, 429이면 잠시 뒤 같은 queueToken으로 재시도합니다.
+   queueToken과 현재 serving seq를 확인하고, Redis Lua script로 입장 토큰을 원자적으로 발급합니다.
+   이미 토큰을 받은 번호표가 재시도하면 TTL이 남은 같은 admissionToken을 돌려줍니다.
 
 6. Frontend -> Ticket Server
    seat/order API에 X-Admission-Token을 붙여 호출합니다.
-
-7. Ticket Server -> Queue Server internal complete
-   주문 생성이 끝나면 신뢰된 서버 간 호출로 active session을 즉시 반환합니다. 호출 실패 시 TTL이 안전망입니다.
 ```
 
 public state 방식에서는 서버가 사용자마다 전역 순번을 계산하지 않습니다. 서버는 shard별로 “현재 몇 번까지 입장 가능하다”는 공통 상태를 만들고, 클라이언트가 자기 shard/localSeq와 비교합니다. 대규모 트래픽의 hot path는 CDN에 캐시된 `/state` API 응답입니다.
@@ -58,16 +55,12 @@ public state 방식에서는 서버가 사용자마다 전역 순번을 계산�
 | `POST` | `/api/v1/queue/performances/{performanceId}/join` | `Authorization: Bearer {accessToken}` | 번호표 발급 |
 | `GET` | `/api/v1/queue/performances/{performanceId}/state` | 없음 | CDN 캐시 대상 public queue state 조회 |
 | `POST` | `/api/v1/queue/performances/{performanceId}/enter` | `X-Queue-Token` | 입장 가능 시 admission token 발급 |
-| `POST` | `/api/v1/queue/internal/performances/{performanceId}/sessions/{queueId}/complete` | `X-Queue-Completion-Secret` | Core 전용 active session 반환 |
-
-내부 완료 API는 브라우저에 노출하는 공개 API가 아닙니다. Ticket Server처럼 신뢰된 호출자만 공유 secret을 보내야 하며, 완료된 번호표의 admission token 재발급도 차단합니다.
-`app.queue.completion-enabled=false`이면 이 API는 비활성화되고 active session은 shopping session TTL로만 만료됩니다. 즉시 반환을 사용할 때만 Queue와 Core 양쪽에서 완료 콜백을 켜고 같은 32자 이상 secret을 설정합니다.
 
 대기 상태 확인은 public state API만 사용합니다. `/status`와 `X-Queue-Session` 기반 polling API는 제공하지 않습니다.
 
 ### queue runtime config
 
-Queue Server는 회차별 queue policy를 Redis에 저장하지 않습니다. 모든 회차는 Queue Server를 통과한다고 보고, 입장 속도와 TTL은 애플리케이션 기본값만 사용합니다.
+Queue Server는 회차별 처리량 정책을 Redis에 저장하지 않습니다. 입장량은 scheduler 공통 `advanceBatchSize`, TTL은 애플리케이션 공통값으로 관리합니다.
 
 ### join 응답
 
@@ -133,12 +126,12 @@ Cloudflare 설정 기준은 `docs/cloudflare-state-api-cache.md`에 정리합니
   "redirectUrl": "/booking/seat?performanceId=1"
 }
 ```
-`/state`의 serving 값은 입장 자격을 뜻할 뿐 실제 발급 보장은 아닙니다. 여러 클라이언트가 CDN 지연 뒤 동시에 `/enter`를 호출할 수 있으므로, 실제 admission token 발급 시점의 Lua script가 최종 정확성 경계입니다. active 또는 token bucket 한도를 넘으면 `429 Too Many Requests`를 반환하며, 같은 queueToken으로 재시도해도 이미 발급된 token은 멱등하게 반환됩니다.
+`/state`의 serving 값은 입장 자격을 뜻합니다. 여러 클라이언트가 CDN 지연 뒤 동시에 `/enter`를 호출할 수 있으므로, 실제 admission token 발급 시점의 Lua script가 순서와 멱등성을 최종 확인합니다. 같은 queueToken으로 재시도하면 TTL이 남은 기존 token을 반환합니다.
 
 
 ## Redis Key
 
-join과 enter readiness hot path는 shard별 key를 사용합니다. key 이름에는 `{performanceId:shardId}` hash tag 형태를 유지하고, public state projection은 회차 단위 `{performanceId}` key를 사용합니다. 회차별·전역 active session 및 rate limit은 한 Lua script에서 원자적으로 갱신할 수 있도록 `{admission}` hash tag를 공유합니다.
+join과 enter readiness hot path는 shard별 key를 사용합니다. key 이름에는 `{performanceId:shardId}` hash tag 형태를 유지하고, public state projection과 입장 멱등 marker는 회차 단위 `{performanceId}` key를 사용합니다.
 
 `/join`은 shard-local counter, user marker, compact ticket, slot tail, pending slot, waiting marker만 갱신합니다. shard state와 public state는 scheduler가 갱신하므로 join hot path에서 public projection write를 하지 않습니다.
 
@@ -147,11 +140,7 @@ q:{performanceId:shardId}:seq                   # shard-local localSeq counter
 q:{performanceId:shardId}:state                 # scheduler가 갱신하는 shard serving/tail state
 q:{performanceId:shardId}:user:{userIdHash}     # 사용자별 중복 join 방지 compact value
 q:{performanceId:shardId}:queue:{queueId}       # queue ticket compact value
-q:{admission}:entered:{performanceId}:{queueId}  # enter 멱등/완료 marker hash
-q:{admission}:sessions                           # 전역 active session ZSET
-q:{admission}:performance:{performanceId}:sessions # 회차별 active session ZSET
-q:{admission}:rate                               # 전역 token bucket
-q:{admission}:performance:{performanceId}:rate   # 회차별 token bucket
+q:{performanceId}:entered:{queueId}              # enter 멱등 marker hash
 q:{performanceId:shardId}:slot-tail             # slot별 local tail hash
 q:{performanceId:shardId}:pending-slots         # 아직 처리되지 않은 slot ZSET
 q:{performanceId:shardId}:waiting-marker        # waiting set 재등록을 줄이는 shard marker
@@ -166,14 +155,10 @@ queue:waiting:performances                      # scheduler scan 대상 performa
 각 shard snapshot은 `q:{performanceId:shardId}:seq`를 읽어 tail을 계산합니다. 그래서 `/join`은 state hash를 매번 갱신하지 않아도 되고, public projection은 scheduler 주기에서만 만들어집니다.
 
 ```text
-capacity = min(
-  maxAdmitPerSecond,
-  maxActiveSessions - totalActiveSessions,
-  pendingInClosedSlots
-)
+capacity = min(advanceBatchSize, pendingInClosedSlots)
 ```
 
-계산 전에는 `q:{admission}:performance:{performanceId}:sessions`에서 만료된 session을 제거해 회차별 active 수를 계산합니다. 실제 입장 시에는 회차별 제한과 전역 제한을 모두 적용합니다.
+`advanceBatchSize`는 회차별 운영 정책이 아니라 scheduler 전체에 적용하는 기술 설정입니다. 기본 실행 주기가 1초이고 batch가 500이면 한 회차는 최대 약 500명/초 전진합니다. 동시에 처리하는 회차가 여러 개면 합계는 더 커질 수 있으므로, 실제 Core 처리량을 측정해 보수적으로 조정해야 합니다.
 
 advance 이후에는 Redis의 public state가 갱신됩니다. 사용자는 `/state` API를 호출하지만 Cloudflare가 이 응답을 짧게 캐시하므로 대부분의 polling 부하는 CDN에서 흡수합니다.
 
@@ -185,15 +170,9 @@ advance 이후에는 Redis의 public state가 갱신됩니다. 사용자는 `/st
 | --- | --- | --- |
 | `spring.data.redis.host` | `localhost` | Redis host |
 | `spring.data.redis.port` | `6379` | Redis port |
-| `app.queue.completion-enabled` | `false` | Core 완료 콜백 API 활성화 여부 |
 | `app.queue.default-queue-ttl` | `24h` | queue token/번호표 TTL |
-| `app.queue.shopping-session-ttl` | `15m` | admission token과 active session TTL |
-| `app.queue.default-max-active-sessions` | `5000` | 회차별 동시 active session 한도 |
-| `app.queue.global-max-active-sessions` | `5000` | 전역 동시 active session 한도 |
-| `app.queue.default-max-admit-per-second` | `500` | 회차별 초당 입장 token refill 속도 |
-| `app.queue.global-max-admit-per-second` | `500` | 전역 초당 입장 token refill 속도 |
-| `app.queue.default-admission-burst-size` | `50` | 회차별 입장 burst 한도 |
-| `app.queue.global-admission-burst-size` | `50` | 전역 입장 burst 한도 |
+| `app.queue.shopping-session-ttl` | `15m` | admission token과 중복 입장 방지 marker TTL |
+| `app.queue.advance-batch-size` | `500` | scheduler가 회차 하나를 한 번에 전진시킬 최대 인원 |
 | `app.queue.default-refresh-after-ms` | `5000` | 클라이언트 state 재조회 권장 간격 |
 | `app.queue.shard-count` | `128` | 회차별 queue shard 수 |
 | `app.queue.slot-size-millis` | `50` | 공정성 time slot 크기 |
@@ -205,19 +184,12 @@ advance 이후에는 Redis의 public state가 갱신됩니다. 사용자는 `/st
 | 환경변수 | 기본값 | 설명 |
 | --- | --- | --- |
 | `QUEUE_TOKEN_SECRET` | 없음 | queueToken 서명 secret, 32바이트 이상 |
-| `QUEUE_COMPLETION_ENABLED` | `false` | Core 완료 콜백 API 활성화 여부 |
-| `QUEUE_COMPLETION_SECRET` | 없음 | 완료 콜백을 켤 때 필수인 인증 secret, 32자 이상 |
-| `QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE` | `5000` | 회차별 active 상한 |
 | `QUEUE_DEFAULT_QUEUE_TTL` | `24h` | API와 scheduler가 공유하는 queue 상태 TTL |
 | `QUEUE_DEFAULT_REFRESH_AFTER_MS` | `5000` | API와 scheduler가 공유하는 state 재조회 권장 간격 |
 | `QUEUE_SHARD_COUNT` | `128` | API와 scheduler가 공유하는 shard 수 |
 | `QUEUE_SLOT_SIZE_MILLIS` | `50` | API와 scheduler가 공유하는 slot 크기 |
 | `QUEUE_SLOT_CLOSE_GRACE_MILLIS` | `200` | API와 scheduler가 공유하는 slot 확정 grace |
-| `QUEUE_MAX_ACTIVE_SESSIONS_GLOBAL` | `5000` | 전역 active 상한 |
-| `QUEUE_MAX_ADMIT_PER_SECOND_PER_PERFORMANCE` | `500` | 회차별 실제 입장률 |
-| `QUEUE_MAX_ADMIT_PER_SECOND_GLOBAL` | `500` | 전역 실제 입장률 |
-| `QUEUE_ADMISSION_BURST_PER_PERFORMANCE` | `50` | 회차별 burst |
-| `QUEUE_ADMISSION_BURST_GLOBAL` | `50` | 전역 burst |
+| `QUEUE_ADVANCE_BATCH_SIZE` | `500` | scheduler의 회차별 1회 전진 인원 |
 | `ADMISSION_TOKEN_SECRET_KEY` | 없음 | Ticket Server와 공유하는 admission token secret, 32바이트 이상 |
 | `JWT_SECRET` | 없음 | Core access token 검증용 JWT secret, 32바이트 이상 |
 | `JWT_ISSUER` | `ticket` | Core access token issuer |
@@ -234,8 +206,6 @@ $env:JWT_ISSUER="ticket"
 $env:JWT_ACCESS_TOKEN_EXPIRATION_SECONDS="1800"
 $env:ADMISSION_TOKEN_SECRET_KEY="local-admission-secret-key-32bytes"
 $env:QUEUE_TOKEN_SECRET="local-queue-token-secret-key-32bytes"
-$env:QUEUE_COMPLETION_ENABLED="true"
-$env:QUEUE_COMPLETION_SECRET="local-queue-completion-secret-key-32bytes"
 
 # 터미널 1: API
 .\gradlew.bat :queue-api:bootRun
@@ -273,9 +243,9 @@ See `deploy/README.md` for EC2 setup and required GitHub Secrets.
 
 ## 남은 운영 검증
 
-기존 버전의 회차별 session key(`q:{performanceId}:sessions`)는 새 `{admission}` key에서 집계되지 않습니다. 운영 전환 시에는 기존 shopping session TTL만큼 입장을 중단해 자연 만료시킨 뒤 새 버전을 활성화하거나, 점검 시간에 기존 session을 통제된 절차로 정리해야 합니다. 두 버전을 동시에 입장 가능 상태로 운영하면 active 수가 과소 집계될 수 있습니다.
+기본 `advanceBatchSize=500`, `advanceIntervalMs=1000`은 측정 결과가 아닙니다. Core 실제 예매 흐름의 마지막 안정 구간을 찾은 뒤 여유를 둔 값으로 조정합니다.
 
-기본 `500/s`, `5000명`은 측정 결과가 아닙니다. Core 실제 예매 흐름의 마지막 안정 구간을 찾은 뒤 70~80% 값을 회차별/전역 환경변수에 반영하고, burst는 100ms 단위 발급량 수준으로 작게 시작합니다.
+현재 batch 한도는 대기 중인 회차마다 각각 적용됩니다. 인기 회차가 동시에 여러 개 열릴 가능성이 생기면, 그때 전체 Core 유입량을 제한하는 전역 예산을 별도 설계합니다.
 
 이 구조는 100만 대기자 polling 부하를 Cloudflare 캐시로 흡수하고, 단일 인기 회차의 join hot key를 shard로 분산하기 위한 구조입니다. CDN cache miss는 Spring Boot와 Redis를 통과하므로, cache hit ratio와 origin request count를 별도로 확인해야 합니다. 정확한 전역 FIFO는 제공하지 않고 50ms slot 단위 공정성과 shard round-robin을 사용합니다.
 
