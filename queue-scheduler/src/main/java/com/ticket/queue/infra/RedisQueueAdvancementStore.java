@@ -32,7 +32,6 @@ public class RedisQueueAdvancementStore implements QueueAdvancementStore {
 
     private static final long ADVANCE_LOCK_LEASE_MILLIS = 5_000L;
     private static final String ADVANCE_QUEUE_STATE_SCRIPT = load("redis/advance_queue_state.lua");
-    private static final String COUNT_ACTIVE_SESSIONS_SCRIPT = load("redis/count_active_sessions.lua");
     private static final String STATUS_OPEN = "OPEN";
     private static final String STATUS_EMPTY = "EMPTY";
     private static final String FIELD_STATUS = "status";
@@ -59,8 +58,7 @@ public class RedisQueueAdvancementStore implements QueueAdvancementStore {
     @Override
     public void advancePublicState(
             final Long performanceId,
-            final int maxAdmitPerSecond,
-            final int maxActiveSessions,
+            final int advanceBatchSize,
             final int shardCount,
             final long slotSizeMillis,
             final long slotCloseGraceMillis,
@@ -68,8 +66,7 @@ public class RedisQueueAdvancementStore implements QueueAdvancementStore {
             final long refreshAfterMs
     ) {
         validatePositive(performanceId, "performanceId");
-        if (maxAdmitPerSecond <= 0
-                || maxActiveSessions <= 0
+        if (advanceBatchSize <= 0
                 || shardCount <= 0
                 || slotSizeMillis <= 0
                 || slotCloseGraceMillis < 0
@@ -87,8 +84,7 @@ public class RedisQueueAdvancementStore implements QueueAdvancementStore {
         try {
             List<ShardQueueState> states = readShardStates(performanceId, shardCount, stateTtl);
             int rrCursor = readRoundRobinCursor(performanceId, shardCount);
-            int activeSessions = activeSessionCount(performanceId);
-            int remaining = Math.clamp(maxActiveSessions - activeSessions, 0, maxAdmitPerSecond);
+            int remaining = advanceBatchSize;
             long lastClosedSlotId = Math.floorDiv(System.currentTimeMillis() - slotCloseGraceMillis, slotSizeMillis);
 
             while (remaining > 0) {
@@ -210,15 +206,6 @@ public class RedisQueueAdvancementStore implements QueueAdvancementStore {
     private int readRoundRobinCursor(final Long performanceId, final int shardCount) {
         String value = publicStateMap(performanceId).get(FIELD_RR_CURSOR);
         return Math.floorMod(Math.toIntExact(parseLong(value, 0L)), shardCount);
-    }
-
-    private int activeSessionCount(final Long performanceId) {
-        Long count = evalScript(
-                COUNT_ACTIVE_SESSIONS_SCRIPT,
-                RScript.ReturnType.LONG,
-                List.of(RedisKey.performanceSessions(performanceId))
-        );
-        return Math.toIntExact(count);
     }
 
     private AdvancePlan planSlotAdvances(

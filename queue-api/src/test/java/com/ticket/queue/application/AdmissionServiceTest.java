@@ -58,7 +58,6 @@ class AdmissionServiceTest {
         queueProperties.setDefaultRefreshAfterMs(5_000L);
         queueProperties.setDefaultQueueTtl(Duration.ofHours(24));
         queueProperties.setShoppingSessionTtl(Duration.ofMinutes(15));
-        queueProperties.setDefaultMaxActiveSessions(5_000);
         queueProperties.setShardCount(128);
         queueProperties.setSlotSizeMillis(50L);
         queueProperties.setJoinPollAfterMs(1_000L);
@@ -165,8 +164,7 @@ class AdmissionServiceTest {
                 17,
                 101L,
                 "candidate-admission-token",
-                Duration.ofMinutes(15),
-                5_000
+                Duration.ofMinutes(15)
         )).thenReturn(EnterResult.notAdmitted());
 
         assertThatExceptionOfType(ResponseStatusException.class)
@@ -186,8 +184,7 @@ class AdmissionServiceTest {
                 17,
                 100L,
                 "candidate-admission-token",
-                Duration.ofMinutes(15),
-                5_000
+                Duration.ofMinutes(15)
         )).thenReturn(EnterResult.admitted("admission-token", 1_717_000_900_000L));
 
         EnterResponse response = service.enter(1L, "queue-token");
@@ -209,8 +206,7 @@ class AdmissionServiceTest {
                 "queue-1",
                 100L,
                 "candidate-admission-token",
-                Duration.ofMinutes(15),
-                5_000
+                Duration.ofMinutes(15)
         )).thenReturn(EnterResult.admitted("admission-token", 1_717_000_900_000L));
 
         EnterResponse response = service.enter(1L, "legacy-token");
@@ -222,8 +218,7 @@ class AdmissionServiceTest {
                 eq(0),
                 eq(100L),
                 eq("candidate-admission-token"),
-                eq(Duration.ofMinutes(15)),
-                eq(5_000)
+                eq(Duration.ofMinutes(15))
         );
     }
 
@@ -239,8 +234,7 @@ class AdmissionServiceTest {
                 17,
                 100L,
                 "candidate-admission-token",
-                Duration.ofMinutes(15),
-                5_000
+                Duration.ofMinutes(15)
         )).thenReturn(EnterResult.admitted("existing-admission-token", 1_717_000_900_000L));
 
         EnterResponse response = service.enter(1L, "queue-token");
@@ -248,26 +242,6 @@ class AdmissionServiceTest {
         assertThat(response.admissionToken()).isEqualTo("existing-admission-token");
     }
 
-    @Test
-    void enter_returns_429_when_active_sessions_are_full() {
-        when(queueTokenService.verify("queue-token"))
-                .thenReturn(new QueueTokenClaims(1L, "queue-1", 17, 100L, 24_691L, 10L));
-        when(admissionTokenIssuer.issue(10L, 1L, "queue-1", Duration.ofMinutes(15)))
-                .thenReturn("candidate-admission-token");
-        when(admissionStateStore.enterQueue(
-                1L,
-                "queue-1",
-                17,
-                100L,
-                "candidate-admission-token",
-                Duration.ofMinutes(15),
-                5_000
-        )).thenReturn(EnterResult.full());
-
-        assertThatExceptionOfType(ResponseStatusException.class)
-                .isThrownBy(() -> service.enter(1L, "queue-token"))
-                .satisfies(exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
-    }
 
     @Test
     void enter_returns_401_when_queue_token_is_invalid_or_expired() {
@@ -284,8 +258,7 @@ class AdmissionServiceTest {
                 eq(17),
                 eq(100L),
                 eq("candidate-admission-token"),
-                eq(Duration.ofMinutes(15)),
-                eq(5_000)
+                eq(Duration.ofMinutes(15))
         );
     }
 }

@@ -13,13 +13,12 @@ public class AdmissionAdvancer {
     private final QueueAdvancementStore queueAdvancementStore;
 
     public void advance(final Long performanceId) {
-        if (queueProperties.getDefaultMaxAdmitPerSecond() <= 0) {
+        if (queueProperties.getAdvanceBatchSize() <= 0) {
             return;
         }
         queueAdvancementStore.advancePublicState(
                 performanceId,
-                queueProperties.getDefaultMaxAdmitPerSecond(),
-                queueProperties.getDefaultMaxActiveSessions(),
+                queueProperties.getAdvanceBatchSize(),
                 queueProperties.getShardCount(),
                 queueProperties.getSlotSizeMillis(),
                 queueProperties.getSlotCloseGraceMillis(),

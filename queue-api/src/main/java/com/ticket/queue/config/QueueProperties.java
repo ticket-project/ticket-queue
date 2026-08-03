@@ -22,10 +22,6 @@ public class QueueProperties {
     @NotNull
     private Duration shoppingSessionTtl = Duration.ofMinutes(15);
     @Positive
-    private int defaultMaxActiveSessions = 5_000;
-    @Positive
-    private int defaultMaxAdmitPerSecond = 500;
-    @Positive
     private long defaultRefreshAfterMs = 5_000L;
     @Positive
     private int shardCount = 128;

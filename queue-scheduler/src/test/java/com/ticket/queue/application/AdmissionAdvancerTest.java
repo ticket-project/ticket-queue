@@ -10,10 +10,9 @@ import org.junit.jupiter.api.Test;
 class AdmissionAdvancerTest {
 
     @Test
-    void admission_uses_configured_tick_limit_as_batch_size() {
+    void admission_uses_configured_batch_size() {
         AdvancementProperties queueProperties = new AdvancementProperties();
-        queueProperties.setDefaultMaxAdmitPerSecond(2);
-        queueProperties.setDefaultMaxActiveSessions(10);
+        queueProperties.setAdvanceBatchSize(2);
         queueProperties.setShardCount(128);
         queueProperties.setSlotSizeMillis(50L);
         queueProperties.setSlotCloseGraceMillis(200L);
@@ -27,7 +26,6 @@ class AdmissionAdvancerTest {
         verify(queueAdvancementStore).advancePublicState(
                 1L,
                 2,
-                10,
                 128,
                 50L,
                 200L,
@@ -37,10 +35,9 @@ class AdmissionAdvancerTest {
     }
 
     @Test
-    void admission_supports_large_tick_limit_as_single_batch_call() {
+    void admission_supports_large_batch_as_single_call() {
         AdvancementProperties queueProperties = new AdvancementProperties();
-        queueProperties.setDefaultMaxAdmitPerSecond(50);
-        queueProperties.setDefaultMaxActiveSessions(300);
+        queueProperties.setAdvanceBatchSize(50);
         queueProperties.setShardCount(64);
         queueProperties.setSlotSizeMillis(25L);
         queueProperties.setSlotCloseGraceMillis(100L);
@@ -52,7 +49,6 @@ class AdmissionAdvancerTest {
         verify(queueAdvancementStore).advancePublicState(
                 1L,
                 50,
-                300,
                 64,
                 25L,
                 100L,

@@ -28,8 +28,7 @@ app:
   queue:
     advance-interval-ms: ${QUEUE_ADVANCE_INTERVAL_MS:1000}
     default-queue-ttl: ${QUEUE_DEFAULT_QUEUE_TTL:24h}
-    default-max-active-sessions: ${QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE:5000}
-    default-max-admit-per-second: ${QUEUE_MAX_ADMIT_PER_SECOND_PER_PERFORMANCE:500}
+    advance-batch-size: ${QUEUE_ADVANCE_BATCH_SIZE:500}
     default-refresh-after-ms: ${QUEUE_DEFAULT_REFRESH_AFTER_MS:5000}
     shard-count: ${QUEUE_SHARD_COUNT:128}
     slot-size-millis: ${QUEUE_SLOT_SIZE_MILLIS:50}

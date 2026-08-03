@@ -9,7 +9,6 @@ public record EnterResult(
     public enum Status {
         ADMITTED,
         NOT_ADMITTED,
-        FULL,
         EXPIRED
     }
 
@@ -22,10 +21,6 @@ public record EnterResult(
 
     public static EnterResult notAdmitted() {
         return new EnterResult(Status.NOT_ADMITTED, null, null);
-    }
-
-    public static EnterResult full() {
-        return new EnterResult(Status.FULL, null, null);
     }
 
     public static EnterResult expired() {

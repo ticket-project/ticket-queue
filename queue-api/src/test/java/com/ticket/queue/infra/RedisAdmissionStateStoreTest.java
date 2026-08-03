@@ -49,13 +49,14 @@ class RedisAdmissionStateStoreTest {
     }
 
     @Test
-    void admission_session_script_checks_existing_admission_before_capacity() {
+    void admission_session_script_reuses_existing_admission_without_counting_active_sessions() {
         String script = RedisScriptLoader.load("redis/admit_queue_session.lua");
 
-        assertThat(script).contains("local existing_token =");
-        assertThat(script).contains("local active_count = redis.call('ZCARD', KEYS[2])");
-        assertThat(script.indexOf("local existing_token =")).isLessThan(script.indexOf("local active_count ="));
-        assertThat(script).contains("redis.call('PEXPIRE', KEYS[2], session_ttl_millis)");
+        assertThat(script)
+                .contains("local existing_token =")
+                .contains("redis.call('PEXPIRE', KEYS[1], admission_ttl_millis)")
+                .doesNotContain("ZCARD")
+                .doesNotContain("ZADD");
     }
 
     @Test
@@ -66,7 +67,6 @@ class RedisAdmissionStateStoreTest {
         assertThat(RedisKey.shardQueue(1L, 17, "queue-1")).isEqualTo("q:{1:17}:queue:queue-1");
         assertThat(RedisKey.shardEntered(1L, 17, "queue-1")).isEqualTo("q:{1:17}:entered:queue-1");
         assertThat(RedisKey.shardSessions(1L, 17)).isEqualTo("q:{1:17}:sessions");
-        assertThat(RedisKey.performanceSessions(1L)).isEqualTo("q:{1}:sessions");
         assertThat(RedisKey.performanceEntered(1L, "queue-1")).isEqualTo("q:{1}:entered:queue-1");
         assertThat(RedisKey.legacyQueue(1L, "queue-1")).isEqualTo("q:{1}:queue:queue-1");
         assertThat(RedisKey.shardSlotTail(1L, 17)).isEqualTo("q:{1:17}:slot-tail");
@@ -232,8 +232,7 @@ class RedisAdmissionStateStoreTest {
                 17,
                 100L,
                 "admission-token",
-                Duration.ofMinutes(15),
-                5_000
+                Duration.ofMinutes(15)
         );
 
         assertThat(actual.status()).isEqualTo(EnterResult.Status.ADMITTED);
@@ -245,26 +244,20 @@ class RedisAdmissionStateStoreTest {
                 argsCaptor.capture()
         );
         assertThat(keysCaptor.getAllValues().get(0))
-                .containsExactly(
-                        RedisKey.performanceEntered(1L, "queue-1"),
-                        RedisKey.performanceSessions(1L)
-                );
+                .containsExactly(RedisKey.performanceEntered(1L, "queue-1"));
         assertThat(keysCaptor.getAllValues().get(1))
                 .containsExactly(
                         RedisKey.shardState(1L, 17),
                         RedisKey.shardQueue(1L, 17, "queue-1")
                 );
         assertThat(keysCaptor.getAllValues().get(2))
-                .containsExactly(
-                        RedisKey.performanceEntered(1L, "queue-1"),
-                        RedisKey.performanceSessions(1L)
-                );
+                .containsExactly(RedisKey.performanceEntered(1L, "queue-1"));
         assertThat(argsCaptor.getAllValues().get(0))
-                .containsExactly("admission-token", 900_000L, 5_000, 0L, "queue-1");
+                .containsExactly("admission-token", 900_000L, 0L);
         assertThat(argsCaptor.getAllValues().get(1))
                 .containsExactly(100L);
         assertThat(argsCaptor.getAllValues().get(2))
-                .containsExactly("admission-token", 900_000L, 5_000, 1L, "queue-1");
+                .containsExactly("admission-token", 900_000L, 1L);
     }
 
     @Test
@@ -320,8 +313,7 @@ class RedisAdmissionStateStoreTest {
                 "queue-1",
                 100L,
                 "admission-token",
-                Duration.ofMinutes(15),
-                5_000
+                Duration.ofMinutes(15)
         );
 
         assertThat(actual.status()).isEqualTo(EnterResult.Status.ADMITTED);
@@ -336,11 +328,10 @@ class RedisAdmissionStateStoreTest {
                 .containsExactly(
                         RedisKey.publicState(1L),
                         RedisKey.performanceEntered(1L, "queue-1"),
-                        RedisKey.performanceSessions(1L),
                         RedisKey.legacyQueue(1L, "queue-1")
                 );
         assertThat(argsCaptor.getValue())
-                .containsExactly(100L, "admission-token", 900_000L, 5_000);
+                .containsExactly(100L, "admission-token", 900_000L);
     }
 
 
