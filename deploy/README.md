@@ -56,12 +56,22 @@ deploy/datadog/conf.d/redisdb.d/conf.yaml -> /home/ubuntu/ticket-queue/datadog/c
 
 `deploy/env.example`을 기준으로 `.env`를 만듭니다.
 
-API 전용 secret은 `JWT_SECRET`, `QUEUE_TOKEN_SECRET`, `ADMISSION_TOKEN_SECRET_KEY`, `QUEUE_COMPLETION_SECRET`입니다. Compose의 `queue` 서비스만 `.env` 전체를 읽고, `scheduler` 서비스에는 이 값들을 전달하지 않습니다. 스케줄러에는 Redis 주소, 입장 정책, 실행 간격, 관측 설정만 전달합니다. 이 경계를 유지하는 이유는 스케줄러 침해 시 API 서명 키까지 노출되는 것을 막기 위해서입니다.
+API 전용 secret은 `JWT_SECRET`, `QUEUE_TOKEN_SECRET`, `ADMISSION_TOKEN_SECRET_KEY`, `QUEUE_COMPLETION_SECRET`입니다. Compose의 `queue` 서비스만 `.env` 전체를 읽고, `scheduler` 서비스에는 이 값들을 전달하지 않습니다. 대신 active session 한도, TTL, refresh, shard/slot처럼 Redis queue 형상을 결정하는 비밀이 아닌 정책 값은 두 서비스에 동일하게 전달합니다. 이 경계를 유지하는 이유는 두 프로세스의 대기열 계산은 일치시키면서도 스케줄러 침해 시 API 서명 키까지 노출되는 것을 막기 위해서입니다.
 
-주요 스케줄러 환경변수:
+API와 scheduler가 공유하는 주요 정책 환경변수:
 
 ```text
+QUEUE_DEFAULT_QUEUE_TTL=24h
 QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE=5000
+QUEUE_DEFAULT_REFRESH_AFTER_MS=5000
+QUEUE_SHARD_COUNT=128
+QUEUE_SLOT_SIZE_MILLIS=50
+QUEUE_SLOT_CLOSE_GRACE_MILLIS=200
+```
+
+Scheduler 전용 환경변수:
+
+```text
 QUEUE_MAX_ADMIT_PER_SECOND_PER_PERFORMANCE=500
 QUEUE_ADVANCE_INTERVAL_MS=1000
 ```
@@ -141,4 +151,4 @@ AWS security group은 `22`, `80`, `443`만 엽니다. Redis `6379`, API `8090`, 
 - 두 ECS service에 동일한 Redis endpoint와 동일한 배포 SHA 사용
 - scheduler security group은 Redis와 관측 경로만 허용
 
-여러 scheduler task를 실행할 수는 있지만 처리량이 task 수만큼 선형 증가하지는 않습니다. 회차별 Redis 분산 락이 중복 전진을 막기 때문에, 우선 1 task로 운영하고 가용성이나 서로 다른 회차 병렬 처리 필요가 확인될 때 늘리는 편이 안전합니다.
+`queue-scheduler`는 1 task로 운영하고 오토스케일링하지 않습니다. 회차별 Redis 분산 락은 롤링 배포나 장애 교체 중 일시적으로 task가 겹칠 때 같은 회차를 동시에 전진하지 못하게 하는 안전장치입니다. 현재 구현은 여러 scheduler task의 상시 active-active 운영이나 task 수와 무관한 초당 입장률을 보장하지 않습니다.

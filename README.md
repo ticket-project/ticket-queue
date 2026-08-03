@@ -12,7 +12,7 @@ queue-scheduler 상시 스케줄링, 입장 인원 계산, public state 갱신
 queue-redis     Redis key, Lua script, Redisson 설정만 공유하는 얇은 라이브러리
 ```
 
-API를 여러 ECS task로 늘려도 스케줄러 수와 함께 늘어나지 않습니다. 스케줄러도 별도 ECS service로 배포할 수 있으며, 여러 task를 실행하더라도 Redis 분산 락으로 같은 회차의 동시 전진을 막습니다. 두 애플리케이션은 같은 Redis와 같은 커밋에서 만들어진 이미지를 사용해야 합니다.
+API를 여러 ECS task로 늘려도 스케줄러 수와 함께 늘어나지 않습니다. 스케줄러는 별도 ECS service에서 기본 1 task로 운영합니다. Redis 분산 락은 롤링 배포나 장애 교체 중 일시적으로 task가 겹칠 때 같은 회차의 동시 전진을 막는 안전장치이며, 여러 scheduler task의 상시 active-active 운영을 보장하지는 않습니다. 두 애플리케이션은 같은 Redis, 같은 대기열 정책 설정, 같은 커밋에서 만들어진 이미지를 사용해야 합니다.
 
 ```text
 client -> nginx -> queue-api -----------+
@@ -208,6 +208,11 @@ advance 이후에는 Redis의 public state가 갱신됩니다. 사용자는 `/st
 | `QUEUE_COMPLETION_ENABLED` | `false` | Core 완료 콜백 API 활성화 여부 |
 | `QUEUE_COMPLETION_SECRET` | 없음 | 완료 콜백을 켤 때 필수인 인증 secret, 32자 이상 |
 | `QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE` | `5000` | 회차별 active 상한 |
+| `QUEUE_DEFAULT_QUEUE_TTL` | `24h` | API와 scheduler가 공유하는 queue 상태 TTL |
+| `QUEUE_DEFAULT_REFRESH_AFTER_MS` | `5000` | API와 scheduler가 공유하는 state 재조회 권장 간격 |
+| `QUEUE_SHARD_COUNT` | `128` | API와 scheduler가 공유하는 shard 수 |
+| `QUEUE_SLOT_SIZE_MILLIS` | `50` | API와 scheduler가 공유하는 slot 크기 |
+| `QUEUE_SLOT_CLOSE_GRACE_MILLIS` | `200` | API와 scheduler가 공유하는 slot 확정 grace |
 | `QUEUE_MAX_ACTIVE_SESSIONS_GLOBAL` | `5000` | 전역 active 상한 |
 | `QUEUE_MAX_ADMIT_PER_SECOND_PER_PERFORMANCE` | `500` | 회차별 실제 입장률 |
 | `QUEUE_MAX_ADMIT_PER_SECOND_GLOBAL` | `500` | 전역 실제 입장률 |
