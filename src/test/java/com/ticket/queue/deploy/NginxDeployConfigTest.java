@@ -75,8 +75,7 @@ class NginxDeployConfigTest {
         assertThat(scheduler)
                 .contains("image: ${QUEUE_SCHEDULER_DOCKER_IMAGE:?QUEUE_SCHEDULER_DOCKER_IMAGE is required}")
                 .contains("SPRING_DATA_REDIS_HOST: redis")
-                .contains("QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE")
-                .contains("QUEUE_MAX_ADMIT_PER_SECOND_PER_PERFORMANCE")
+                .contains("QUEUE_ADVANCE_BATCH_SIZE")
                 .contains("QUEUE_ADVANCE_INTERVAL_MS")
                 .contains("DD_SERVICE: ticket-queue-scheduler")
                 .contains("- \"8091\"")
@@ -186,6 +185,7 @@ class NginxDeployConfigTest {
                 .contains("name: ticket-queue-scheduler")
                 .contains("service: ${DD_SERVICE:ticket-queue-scheduler}")
                 .contains("advance-interval-ms: ${QUEUE_ADVANCE_INTERVAL_MS:1000}")
+                .contains("advance-batch-size: ${QUEUE_ADVANCE_BATCH_SIZE:500}")
                 .doesNotContain("JWT_SECRET")
                 .doesNotContain("ADMISSION_TOKEN_SECRET_KEY")
                 .doesNotContain("QUEUE_TOKEN_SECRET");
@@ -199,8 +199,7 @@ class NginxDeployConfigTest {
         assertThat(env)
                 .contains("QUEUE_API_DOCKER_IMAGE=your-dockerhub-user/ticket-queue-api:latest")
                 .contains("QUEUE_SCHEDULER_DOCKER_IMAGE=your-dockerhub-user/ticket-queue-scheduler:latest")
-                .contains("QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE=5000")
-                .contains("QUEUE_MAX_ADMIT_PER_SECOND_PER_PERFORMANCE=500")
+                .contains("QUEUE_ADVANCE_BATCH_SIZE=500")
                 .contains("QUEUE_DEFAULT_QUEUE_TTL=24h")
                 .contains("QUEUE_DEFAULT_REFRESH_AFTER_MS=5000")
                 .contains("QUEUE_SHARD_COUNT=128")
@@ -252,7 +251,6 @@ class NginxDeployConfigTest {
     private void assertCommonQueuePolicyEnvironment(final String service) {
         assertThat(service)
                 .contains("QUEUE_DEFAULT_QUEUE_TTL: ${QUEUE_DEFAULT_QUEUE_TTL:-24h}")
-                .contains("QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE: ${QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE:-5000}")
                 .contains("QUEUE_DEFAULT_REFRESH_AFTER_MS: ${QUEUE_DEFAULT_REFRESH_AFTER_MS:-5000}")
                 .contains("QUEUE_SHARD_COUNT: ${QUEUE_SHARD_COUNT:-128}")
                 .contains("QUEUE_SLOT_SIZE_MILLIS: ${QUEUE_SLOT_SIZE_MILLIS:-50}")
@@ -262,7 +260,6 @@ class NginxDeployConfigTest {
     private void assertCommonQueuePolicyBindings(final String config) {
         assertThat(config)
                 .contains("default-queue-ttl: ${QUEUE_DEFAULT_QUEUE_TTL:24h}")
-                .contains("default-max-active-sessions: ${QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE:5000}")
                 .contains("default-refresh-after-ms: ${QUEUE_DEFAULT_REFRESH_AFTER_MS:5000}")
                 .contains("shard-count: ${QUEUE_SHARD_COUNT:128}")
                 .contains("slot-size-millis: ${QUEUE_SLOT_SIZE_MILLIS:50}")
