@@ -56,13 +56,12 @@ deploy/datadog/conf.d/redisdb.d/conf.yaml -> /home/ubuntu/ticket-queue/datadog/c
 
 `deploy/env.example`을 기준으로 `.env`를 만듭니다.
 
-API 전용 secret은 `JWT_SECRET`, `QUEUE_TOKEN_SECRET`, `ADMISSION_TOKEN_SECRET_KEY`, `QUEUE_COMPLETION_SECRET`입니다. Compose의 `queue` 서비스만 `.env` 전체를 읽고, `scheduler` 서비스에는 이 값들을 전달하지 않습니다. 대신 active session 한도, TTL, refresh, shard/slot처럼 Redis queue 형상을 결정하는 비밀이 아닌 정책 값은 두 서비스에 동일하게 전달합니다. 이 경계를 유지하는 이유는 두 프로세스의 대기열 계산은 일치시키면서도 스케줄러 침해 시 API 서명 키까지 노출되는 것을 막기 위해서입니다.
+API 전용 secret은 `JWT_SECRET`, `QUEUE_TOKEN_SECRET`, `ADMISSION_TOKEN_SECRET_KEY`입니다. Compose의 `queue` 서비스만 `.env` 전체를 읽고, `scheduler` 서비스에는 이 값들을 전달하지 않습니다. 대신 TTL, refresh, shard/slot처럼 Redis queue 형상을 결정하는 비밀이 아닌 기술 설정은 두 서비스에 동일하게 전달합니다. 이 경계를 유지하는 이유는 두 프로세스의 대기열 계산은 일치시키면서도 스케줄러 침해 시 API 서명 키까지 노출되는 것을 막기 위해서입니다.
 
 API와 scheduler가 공유하는 주요 정책 환경변수:
 
 ```text
 QUEUE_DEFAULT_QUEUE_TTL=24h
-QUEUE_MAX_ACTIVE_SESSIONS_PER_PERFORMANCE=5000
 QUEUE_DEFAULT_REFRESH_AFTER_MS=5000
 QUEUE_SHARD_COUNT=128
 QUEUE_SLOT_SIZE_MILLIS=50
@@ -72,7 +71,7 @@ QUEUE_SLOT_CLOSE_GRACE_MILLIS=200
 Scheduler 전용 환경변수:
 
 ```text
-QUEUE_MAX_ADMIT_PER_SECOND_PER_PERFORMANCE=500
+QUEUE_ADVANCE_BATCH_SIZE=500
 QUEUE_ADVANCE_INTERVAL_MS=1000
 ```
 
@@ -97,7 +96,7 @@ AWS_VM_PORT
 
 `AWS_VM_PORT`는 SSH가 22번 포트를 사용한다면 생략할 수 있습니다.
 
-Queue Server는 외부 GitHub Packages를 읽지 않는다. EC2 `.env`에는 Core access token 검증용 `JWT_SECRET`, `JWT_ISSUER`, `JWT_ACCESS_TOKEN_EXPIRATION_SECONDS`, queue/admission token secret, Core와 공유하는 `QUEUE_COMPLETION_SECRET`, 측정된 입장률·active·burst 한도를 설정한다.
+Queue Server는 외부 GitHub Packages를 읽지 않는다. EC2 `.env`에는 Core access token 검증용 `JWT_SECRET`, `JWT_ISSUER`, `JWT_ACCESS_TOKEN_EXPIRATION_SECONDS`, queue/admission token secret, 공통 TTL·shard·slot 설정과 scheduler의 `QUEUE_ADVANCE_BATCH_SIZE`를 설정한다.
 
 Workflow는 `master` push에서 실행되고, GitHub Actions에서 수동 실행도 가능하다.
 
@@ -151,4 +150,4 @@ AWS security group은 `22`, `80`, `443`만 엽니다. Redis `6379`, API `8090`, 
 - 두 ECS service에 동일한 Redis endpoint와 동일한 배포 SHA 사용
 - scheduler security group은 Redis와 관측 경로만 허용
 
-`queue-scheduler`는 1 task로 운영하고 오토스케일링하지 않습니다. 회차별 Redis 분산 락은 롤링 배포나 장애 교체 중 일시적으로 task가 겹칠 때 같은 회차를 동시에 전진하지 못하게 하는 안전장치입니다. 현재 구현은 여러 scheduler task의 상시 active-active 운영이나 task 수와 무관한 초당 입장률을 보장하지 않습니다.
+`queue-scheduler`는 1 task로 운영하고 오토스케일링하지 않습니다. 회차별 Redis 분산 락은 롤링 배포나 장애 교체 중 일시적으로 task가 겹칠 때 같은 회차를 동시에 전진하지 못하게 하는 안전장치입니다. `QUEUE_ADVANCE_BATCH_SIZE`는 한 번 락을 잡아 실행할 때의 한도이므로 여러 task가 번갈아 실행하면 실제 입장 속도가 커질 수 있습니다. 따라서 현재 구현은 상시 active-active보다 1 task와 ECS 자동 복구를 전제로 합니다.
