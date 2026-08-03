@@ -20,9 +20,7 @@ public class AdvancementProperties {
     @NotNull
     private Duration defaultQueueTtl = Duration.ofHours(24);
     @Positive
-    private int defaultMaxActiveSessions = 5_000;
-    @Positive
-    private int defaultMaxAdmitPerSecond = 500;
+    private int advanceBatchSize = 500;
     @Positive
     private long defaultRefreshAfterMs = 5_000L;
     @Positive

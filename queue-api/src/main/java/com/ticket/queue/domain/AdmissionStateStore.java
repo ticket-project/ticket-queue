@@ -20,8 +20,7 @@ public interface AdmissionStateStore {
             int shardId,
             Long localSeq,
             String admissionToken,
-            Duration shoppingSessionTtl,
-            int maxActiveSessions
+            Duration shoppingSessionTtl
     );
 
     EnterResult enterLegacyQueue(
@@ -29,8 +28,7 @@ public interface AdmissionStateStore {
             String queueId,
             Long seq,
             String admissionToken,
-            Duration shoppingSessionTtl,
-            int maxActiveSessions
+            Duration shoppingSessionTtl
     );
 
 }

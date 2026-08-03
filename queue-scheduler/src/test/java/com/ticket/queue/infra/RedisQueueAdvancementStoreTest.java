@@ -58,11 +58,10 @@ class RedisQueueAdvancementStoreTest {
                 any(Object[].class)
         )).thenReturn(
                 List.of(0L, 2L, 0L, 0L, 2L),
-                0L,
                 List.of(1L, 2L, 0L, 0L, 2L)
         );
 
-        store.advancePublicState(1L, 10, 5_000, 1, 50L, 200L, Duration.ofHours(24), 5_000L);
+        store.advancePublicState(1L, 10, 1, 50L, 200L, Duration.ofHours(24), 5_000L);
 
         verify(stateMap).putAll(any(Map.class));
         verify(stateMap).expire(Duration.ofHours(24));
@@ -95,13 +94,12 @@ class RedisQueueAdvancementStoreTest {
                 any(Object[].class)
         )).thenReturn(
                 List.of(0L, 3L, 0L, 0L, 3L),
-                0L,
                 List.of(3L, 4L, 0L, 1L, 4L)
         );
 
-        store.advancePublicState(1L, 3, 10, 1, 50L, 200L, Duration.ofHours(24), 5_000L);
+        store.advancePublicState(1L, 3, 1, 50L, 200L, Duration.ofHours(24), 5_000L);
 
-        verify(script, times(3)).evalSha(
+        verify(script, times(2)).evalSha(
                 eq(RScript.Mode.READ_WRITE),
                 eq("advance-sha"),
                 any(RScript.ReturnType.class),
@@ -109,8 +107,7 @@ class RedisQueueAdvancementStoreTest {
                 argsCaptor.capture()
         );
         assertThat(argsCaptor.getAllValues().get(0)).containsExactly("SNAPSHOT", 86_400_000L);
-        assertThat(argsCaptor.getAllValues().get(1)).isEmpty();
-        assertThat(argsCaptor.getAllValues().get(2)).containsExactly("ADVANCE", 86_400_000L, 3);
+        assertThat(argsCaptor.getAllValues().get(1)).containsExactly("ADVANCE", 86_400_000L, 3);
         verify(stateMap).putAll(any(Map.class));
         verify(lock).unlock();
     }}

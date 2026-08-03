@@ -9,8 +9,7 @@ public interface QueueAdvancementStore {
 
     void advancePublicState(
             Long performanceId,
-            int maxAdmitPerSecond,
-            int maxActiveSessions,
+            int advanceBatchSize,
             int shardCount,
             long slotSizeMillis,
             long slotCloseGraceMillis,

@@ -58,7 +58,6 @@ public class AdmissionService {
                     redirectProperties.resolve(performanceId)
             );
             case NOT_ADMITTED -> throw new ResponseStatusException(HttpStatus.FORBIDDEN, "queue sequence not admitted");
-            case FULL -> throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "active sessions are full");
             case EXPIRED -> throw new ResponseStatusException(HttpStatus.GONE, "queue entry expired");
         };
     }
@@ -135,8 +134,7 @@ public class AdmissionService {
                     claims.queueId(),
                     claims.localSeq(),
                     admissionToken,
-                    queueProperties.getShoppingSessionTtl(),
-                    queueProperties.getDefaultMaxActiveSessions()
+                    queueProperties.getShoppingSessionTtl()
             );
         }
         return admissionStateStore.enterQueue(
@@ -145,8 +143,7 @@ public class AdmissionService {
                 claims.shardId(),
                 claims.localSeq(),
                 admissionToken,
-                queueProperties.getShoppingSessionTtl(),
-                queueProperties.getDefaultMaxActiveSessions()
+                queueProperties.getShoppingSessionTtl()
         );
     }
 

@@ -46,7 +46,6 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     private static final String FIELD_REFRESH_AFTER_MS = "refreshAfterMs";
     private static final String FIELD_RR_CURSOR = "rrCursor";
     private static final long ENTER_ADMITTED = 1L;
-    private static final long ENTER_FULL = 2L;
     private static final long ENTER_EXPIRED = 3L;
     private static final long SESSION_ADMIT_DISABLED = 0L;
     private static final long SESSION_ADMIT_ENABLED = 1L;
@@ -92,24 +91,19 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             final int shardId,
             final Long localSeq,
             final String admissionToken,
-            final Duration shoppingSessionTtl,
-            final int maxActiveSessions
+            final Duration shoppingSessionTtl
     ) {
         validatePositive(performanceId, "performanceId");
         validateNotBlank(queueId, "queueId");
         validateNonNegative(shardId, "shardId");
         validatePositive(localSeq, "localSeq");
         validateNotBlank(admissionToken, "admissionToken");
-        if (maxActiveSessions <= 0) {
-            throw new IllegalArgumentException("maxActiveSessions must be positive");
-        }
 
         EnterResult existing = toEnterResult(runSessionScript(
                 performanceId,
                 queueId,
                 admissionToken,
                 shoppingSessionTtl,
-                maxActiveSessions,
                 SESSION_ADMIT_DISABLED
         ));
         if (existing.status() == EnterResult.Status.ADMITTED) {
@@ -129,7 +123,6 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
                 queueId,
                 admissionToken,
                 shoppingSessionTtl,
-                maxActiveSessions,
                 SESSION_ADMIT_ENABLED
         ));
     }
@@ -140,16 +133,12 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             final String queueId,
             final Long seq,
             final String admissionToken,
-            final Duration shoppingSessionTtl,
-            final int maxActiveSessions
+            final Duration shoppingSessionTtl
     ) {
         validatePositive(performanceId, "performanceId");
         validateNotBlank(queueId, "queueId");
         validatePositive(seq, "seq");
         validateNotBlank(admissionToken, "admissionToken");
-        if (maxActiveSessions <= 0) {
-            throw new IllegalArgumentException("maxActiveSessions must be positive");
-        }
 
         return toEnterResult(evalScript(
                 LEGACY_ENTER_QUEUE_SCRIPT,
@@ -157,8 +146,7 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
                 legacyEnterKeys(performanceId, queueId),
                 seq,
                 admissionToken,
-                ttlDuration(shoppingSessionTtl).toMillis(),
-                maxActiveSessions
+                ttlDuration(shoppingSessionTtl).toMillis()
         ));
     }
 
@@ -249,7 +237,6 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             final String queueId,
             final String admissionToken,
             final Duration shoppingSessionTtl,
-            final int maxActiveSessions,
             final long admitRequested
     ) {
         return evalScript(
@@ -258,9 +245,7 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
                 sessionKeys(performanceId, queueId),
                 admissionToken,
                 ttlDuration(shoppingSessionTtl).toMillis(),
-                maxActiveSessions,
-                admitRequested,
-                queueId
+                admitRequested
         );
     }
 
@@ -280,8 +265,7 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
             final String queueId
     ) {
         return List.of(
-                RedisKey.performanceEntered(performanceId, queueId),
-                RedisKey.performanceSessions(performanceId)
+                RedisKey.performanceEntered(performanceId, queueId)
         );
     }
 
@@ -292,7 +276,6 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
         return List.of(
                 RedisKey.publicState(performanceId),
                 RedisKey.performanceEntered(performanceId, queueId),
-                RedisKey.performanceSessions(performanceId),
                 RedisKey.legacyQueue(performanceId, queueId)
         );
     }
@@ -301,9 +284,6 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
         long status = asLong(result.get(0));
         if (status == ENTER_ADMITTED) {
             return EnterResult.admitted(asString(result.get(1)), asLong(result.get(2)));
-        }
-        if (status == ENTER_FULL) {
-            return EnterResult.full();
         }
         if (status == ENTER_EXPIRED) {
             return EnterResult.expired();
