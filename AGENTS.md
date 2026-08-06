@@ -67,3 +67,13 @@ rg -n "include\\(|project\\(" README.md AGENTS.md settings.gradle build.gradle
 ## 보고
 
 마무리 보고에는 변경 파일, 핵심 변경점, 검증 결과, 남은 리스크를 포함한다.
+
+## 커밋 및 PR
+
+- 커밋 메시지와 PR 제목은 Conventional Commits 기반 `<type>(<scope>): <한국어 설명>` 형식을 따른다.
+- `scope`는 선택 사항이며 기존 도메인 또는 모듈 이름을 우선 사용한다.
+- 허용 `type`은 `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `build`, `ci`, `security`, `revert`다.
+- 설명은 한국어로 작성하고 마침표를 붙이지 않는다. 기술 고유명사는 원문 표기를 허용한다.
+- 하나의 커밋에는 하나의 목적만 포함하며 기존 사용자 변경과 섞지 않는다.
+- 커밋 또는 PR을 만들기 전에 [커밋과 PR 컨벤션](docs/development.md#커밋과-pr-컨벤션)을 확인한다.
+- 이미 원격에 올라간 커밋 이력을 변경하려면 먼저 사용자 승인을 받는다.
