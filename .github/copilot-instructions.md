@@ -5,10 +5,11 @@
 ## 문서 우선순위
 
 1. `AGENTS.md`
-2. `README.md`
-3. `docs/cloudflare-state-api-cache.md`
-4. `docs/superpowers/specs/2026-06-06-queue-simplification-design.md`
-5. `build.gradle`, `settings.gradle`, 테스트 코드
+2. `docs/development.md`
+3. `README.md`
+4. `docs/cloudflare-state-api-cache.md`
+5. `docs/superpowers/specs/2026-06-06-queue-simplification-design.md`
+6. `build.gradle`, `settings.gradle`, 테스트 코드
 
 ## Copilot 전용 리뷰 기준
 
