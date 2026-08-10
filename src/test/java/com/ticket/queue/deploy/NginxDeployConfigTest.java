@@ -19,6 +19,7 @@ class NginxDeployConfigTest {
     private static final Path DATADOG_REDIS_CONFIG = Path.of("deploy/datadog/conf.d/redisdb.d/conf.yaml");
     private static final Path API_DOCKERFILE = Path.of("queue-api/Dockerfile");
     private static final Path SCHEDULER_DOCKERFILE = Path.of("queue-scheduler/Dockerfile");
+    private static final Path CI_WORKFLOW = Path.of(".github/workflows/ci.yml");
     private static final Path DEPLOY_WORKFLOW = Path.of(".github/workflows/deploy.yml");
     private static final Path API_APPLICATION_CONFIG = Path.of("queue-api/src/main/resources/application.yml");
     private static final Path SCHEDULER_APPLICATION_CONFIG = Path.of("queue-scheduler/src/main/resources/application.yml");
@@ -124,7 +125,9 @@ class NginxDeployConfigTest {
                 .contains("namespace\":\"ticket_queue_api")
                 .contains("namespace\":\"ticket_queue_scheduler")
                 .contains("DD_APM_ENABLED: \"true\"")
-                .contains("DD_LOGS_ENABLED: \"true\"");
+                .contains("DD_LOGS_ENABLED: \"true\"")
+                .contains("DD_VERSION: ${DD_VERSION:?DD_VERSION is required}")
+                .contains("com.datadoghq.tags.version: ${DD_VERSION:?DD_VERSION is required}");
     }
 
     @Test
@@ -144,12 +147,20 @@ class NginxDeployConfigTest {
     }
 
     @Test
-    void deploy_workflow_builds_and_deploys_both_sha_pinned_images() {
+    void ci_builds_verified_jars_and_deploy_reuses_sha_pinned_images() {
+        String ci = read(CI_WORKFLOW);
         String workflow = read(DEPLOY_WORKFLOW);
 
-        assertThat(workflow)
+        assertThat(ci)
                 .contains(":queue-api:bootJar")
                 .contains(":queue-scheduler:bootJar")
+                .contains("name: queue-api-jar")
+                .contains("name: queue-scheduler-jar");
+        assertThat(workflow)
+                .contains("uses: ./.github/workflows/ci.yml")
+                .contains("needs: verify")
+                .contains("Download verified Queue API jar")
+                .contains("Download verified Queue Scheduler jar")
                 .contains("context: ./queue-api")
                 .contains("file: ./queue-api/Dockerfile")
                 .contains("context: ./queue-scheduler")
@@ -160,6 +171,7 @@ class NginxDeployConfigTest {
                 .contains("SCHEDULER_IMAGE=\"${{ secrets.DOCKER_USERNAME }}/ticket-queue-scheduler:${{ github.sha }}\"")
                 .contains("QUEUE_API_DOCKER_IMAGE=\"$API_IMAGE\"")
                 .contains("QUEUE_SCHEDULER_DOCKER_IMAGE=\"$SCHEDULER_IMAGE\"")
+                .contains("DD_VERSION=\"${{ github.sha }}\"")
                 .contains("DEPLOY_DIR=\"/home/ubuntu/ticket-queue\"")
                 .contains("environment: aws-queue")
                 .doesNotContain("DOCKER_IMAGE=\"$IMAGE\"")
@@ -197,8 +209,9 @@ class NginxDeployConfigTest {
         String env = read(ENV_EXAMPLE);
 
         assertThat(env)
-                .contains("QUEUE_API_DOCKER_IMAGE=your-dockerhub-user/ticket-queue-api:latest")
-                .contains("QUEUE_SCHEDULER_DOCKER_IMAGE=your-dockerhub-user/ticket-queue-scheduler:latest")
+                .contains("QUEUE_API_DOCKER_IMAGE=your-dockerhub-user/ticket-queue-api:<git-sha>")
+                .contains("QUEUE_SCHEDULER_DOCKER_IMAGE=your-dockerhub-user/ticket-queue-scheduler:<git-sha>")
+                .contains("DD_VERSION=<git-sha>")
                 .contains("QUEUE_ADVANCE_BATCH_SIZE=500")
                 .contains("QUEUE_DEFAULT_QUEUE_TTL=24h")
                 .contains("QUEUE_DEFAULT_REFRESH_AFTER_MS=5000")
