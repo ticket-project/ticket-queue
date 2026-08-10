@@ -65,8 +65,6 @@ class RedisAdmissionStateStoreTest {
         assertThat(RedisKey.shardState(1L, 17)).isEqualTo("q:{1:17}:state");
         assertThat(RedisKey.shardUser(1L, 17, "user-hash")).isEqualTo("q:{1:17}:user:user-hash");
         assertThat(RedisKey.shardQueue(1L, 17, "queue-1")).isEqualTo("q:{1:17}:queue:queue-1");
-        assertThat(RedisKey.shardEntered(1L, 17, "queue-1")).isEqualTo("q:{1:17}:entered:queue-1");
-        assertThat(RedisKey.shardSessions(1L, 17)).isEqualTo("q:{1:17}:sessions");
         assertThat(RedisKey.performanceEntered(1L, "queue-1")).isEqualTo("q:{1}:entered:queue-1");
         assertThat(RedisKey.legacyQueue(1L, "queue-1")).isEqualTo("q:{1}:queue:queue-1");
         assertThat(RedisKey.shardSlotTail(1L, 17)).isEqualTo("q:{1:17}:slot-tail");

@@ -136,16 +136,17 @@ join과 enter readiness hot path는 shard별 key를 사용합니다. key 이름�
 `/join`은 shard-local counter, user marker, compact ticket, slot tail, pending slot, waiting marker만 갱신합니다. shard state와 public state는 scheduler가 갱신하므로 join hot path에서 public projection write를 하지 않습니다.
 
 ```text
-q:{performanceId:shardId}:seq                   # shard-local localSeq counter
-q:{performanceId:shardId}:state                 # scheduler가 갱신하는 shard serving/tail state
-q:{performanceId:shardId}:user:{userIdHash}     # 사용자별 중복 join 방지 compact value
-q:{performanceId:shardId}:queue:{queueId}       # queue ticket compact value
-q:{performanceId}:entered:{queueId}              # enter 멱등 marker hash
-q:{performanceId:shardId}:slot-tail             # slot별 local tail hash
-q:{performanceId:shardId}:pending-slots         # 아직 처리되지 않은 slot ZSET
-q:{performanceId:shardId}:waiting-marker        # waiting set 재등록을 줄이는 shard marker
-q:{performanceId}:state                         # public state projection hash
-queue:waiting:performances                      # scheduler scan 대상 performanceId set
+q:{performanceId:shardId}:seq                   # shard-local localSeq counter; defaultQueueTtl
+q:{performanceId:shardId}:state                 # scheduler가 갱신하는 shard serving/tail state; defaultQueueTtl
+q:{performanceId:shardId}:user:{userIdHash}     # 사용자별 중복 join 방지 compact value; defaultQueueTtl
+q:{performanceId:shardId}:queue:{queueId}       # queue ticket compact value; defaultQueueTtl
+q:{performanceId:shardId}:slot-tail             # slot별 local tail hash; defaultQueueTtl
+q:{performanceId:shardId}:pending-slots         # 아직 처리되지 않은 slot ZSET; defaultQueueTtl
+q:{performanceId:shardId}:waiting-marker        # waiting set 재등록을 줄이는 shard marker; 10초
+q:{performanceId}:state                         # public state projection hash; defaultQueueTtl
+q:{performanceId}:entered:{queueId}             # enter 멱등 marker hash; shoppingSessionTtl
+q:{performanceId}:queue:{queueId}               # 이전 queue ticket 호환 조회용; 새 join은 생성하지 않음
+queue:waiting:performances                       # scheduler scan 대상 performanceId set; TTL 없이 비면 제거
 ```
 
 ## Scheduler
