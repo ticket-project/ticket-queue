@@ -47,7 +47,7 @@ services:
       DD_SERVICE: ticket-queue-api
       DD_ENV: ${DD_ENV:-prod}
       DD_SITE: ${DD_SITE:-us5.datadoghq.com}
-      DD_VERSION: ${DD_VERSION:-latest}
+      DD_VERSION: ${DD_VERSION:?DD_VERSION is required}
       DD_LOGS_INJECTION: "true"
       DD_RUNTIME_METRICS_ENABLED: "true"
     ports:
@@ -55,7 +55,7 @@ services:
     labels:
       com.datadoghq.tags.service: ticket-queue-api
       com.datadoghq.tags.env: ${DD_ENV:-prod}
-      com.datadoghq.tags.version: ${DD_VERSION:-latest}
+      com.datadoghq.tags.version: ${DD_VERSION:?DD_VERSION is required}
       com.datadoghq.ad.logs: >-
         [{"source":"java","service":"ticket-queue-api"}]
       com.datadoghq.ad.checks: >-
@@ -86,7 +86,7 @@ services:
       DD_SERVICE: ticket-queue-scheduler
       DD_ENV: ${DD_ENV:-prod}
       DD_SITE: ${DD_SITE:-us5.datadoghq.com}
-      DD_VERSION: ${DD_VERSION:-latest}
+      DD_VERSION: ${DD_VERSION:?DD_VERSION is required}
       DD_LOGS_INJECTION: "true"
       DD_RUNTIME_METRICS_ENABLED: "true"
     expose:
@@ -94,7 +94,7 @@ services:
     labels:
       com.datadoghq.tags.service: ticket-queue-scheduler
       com.datadoghq.tags.env: ${DD_ENV:-prod}
-      com.datadoghq.tags.version: ${DD_VERSION:-latest}
+      com.datadoghq.tags.version: ${DD_VERSION:?DD_VERSION is required}
       com.datadoghq.ad.logs: >-
         [{"source":"java","service":"ticket-queue-scheduler"}]
       com.datadoghq.ad.checks: >-

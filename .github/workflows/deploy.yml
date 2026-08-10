@@ -52,9 +52,7 @@ jobs:
           context: ./queue-api
           file: ./queue-api/Dockerfile
           push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/ticket-queue-api:latest
-            ${{ secrets.DOCKER_USERNAME }}/ticket-queue-api:${{ github.sha }}
+          tags: ${{ secrets.DOCKER_USERNAME }}/ticket-queue-api:${{ github.sha }}
           cache-from: type=gha,scope=queue-api
           cache-to: type=gha,mode=max,scope=queue-api
 
@@ -64,9 +62,7 @@ jobs:
           context: ./queue-scheduler
           file: ./queue-scheduler/Dockerfile
           push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/ticket-queue-scheduler:latest
-            ${{ secrets.DOCKER_USERNAME }}/ticket-queue-scheduler:${{ github.sha }}
+          tags: ${{ secrets.DOCKER_USERNAME }}/ticket-queue-scheduler:${{ github.sha }}
           cache-from: type=gha,scope=queue-scheduler
           cache-to: type=gha,mode=max,scope=queue-scheduler
 
@@ -155,5 +151,5 @@ jobs:
             echo "${{ secrets.DOCKER_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
             sudo docker pull "$API_IMAGE"
             sudo docker pull "$SCHEDULER_IMAGE"
-            sudo QUEUE_API_DOCKER_IMAGE="$API_IMAGE" QUEUE_SCHEDULER_DOCKER_IMAGE="$SCHEDULER_IMAGE" docker compose -f docker-compose.yml up -d --remove-orphans
+            sudo QUEUE_API_DOCKER_IMAGE="$API_IMAGE" QUEUE_SCHEDULER_DOCKER_IMAGE="$SCHEDULER_IMAGE" DD_VERSION="${{ github.sha }}" docker compose -f docker-compose.yml up -d --remove-orphans
             sudo docker image prune -f
