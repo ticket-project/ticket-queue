@@ -38,14 +38,6 @@ public final class RedisKey {
         return "q:" + shardHashTag(performanceId, shardId) + ":queue:" + queueId;
     }
 
-    public static String shardEntered(final Long performanceId, final int shardId, final String queueId) {
-        return "q:" + shardHashTag(performanceId, shardId) + ":entered:" + queueId;
-    }
-
-    public static String shardSessions(final Long performanceId, final int shardId) {
-        return "q:" + shardHashTag(performanceId, shardId) + ":sessions";
-    }
-
     public static String shardSlotTail(final Long performanceId, final int shardId) {
         return "q:" + shardHashTag(performanceId, shardId) + ":slot-tail";
     }
