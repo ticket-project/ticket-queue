@@ -30,7 +30,7 @@ jobs:
       - name: Test and build
         run: |
           chmod +x ./gradlew
-          ./gradlew test :queue-api:bootJar :queue-scheduler:bootJar --no-daemon
+          ./gradlew test integrationTest :queue-api:bootJar :queue-scheduler:bootJar --no-daemon
 
       - name: Upload verified Queue API jar
         uses: actions/upload-artifact@v4

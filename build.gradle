@@ -19,6 +19,33 @@ java {
     }
 }
 
+evaluationDependsOn(':queue-api')
+evaluationDependsOn(':queue-scheduler')
+
+sourceSets {
+    integrationTest {
+        java.srcDir file('src/integrationTest/java')
+        resources.srcDir file('src/integrationTest/resources')
+        compileClasspath += files(
+                project(':queue-api').sourceSets.main.output,
+                project(':queue-scheduler').sourceSets.main.output
+        )
+        compileClasspath += project(':queue-api').sourceSets.main.compileClasspath
+        compileClasspath += project(':queue-scheduler').sourceSets.main.compileClasspath
+        runtimeClasspath += files(
+                project(':queue-api').sourceSets.main.output,
+                project(':queue-scheduler').sourceSets.main.output
+        )
+        runtimeClasspath += project(':queue-api').sourceSets.main.runtimeClasspath
+        runtimeClasspath += project(':queue-scheduler').sourceSets.main.runtimeClasspath
+    }
+}
+
+configurations {
+    integrationTestImplementation.extendsFrom testImplementation
+    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
 dependencyManagement {
     imports {
         mavenBom "org.springframework.boot:spring-boot-dependencies:${property('springBootVersion')}"
@@ -28,6 +55,7 @@ dependencyManagement {
 dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    integrationTestImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -36,4 +64,21 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+tasks.named('compileIntegrationTestJava') {
+    dependsOn ':queue-api:classes', ':queue-scheduler:classes'
+}
+
+tasks.register('integrationTest', Test) {
+    description = 'Runs Queue Redis and Lua integration tests.'
+    group = 'verification'
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    useJUnitPlatform()
+    shouldRunAfter tasks.named('test')
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('integrationTest')
 }

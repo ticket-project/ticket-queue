@@ -92,3 +92,19 @@ Redis 조회와 계산을 락 밖에서 처리해 scheduler가
 - 사용자가 커밋을 명시적으로 요청하지 않으면 커밋하지 않는다.
 - 이미 푸시한 커밋 메시지를 변경하려면 영향과 이력 변경을 설명하고 사용자 승인 후 진행한다.
 - force push가 필요하면 원격이 예상한 상태일 때만 갱신하는 `--force-with-lease`를 사용한다.
+
+## 검증 명령
+
+일반 단위 테스트는 로컬 JVM만 사용한다.
+
+```powershell
+.\gradlew.bat test
+```
+
+Redis key·TTL·Lua 또는 API와 scheduler 사이의 대기열 상태 계약을 바꿀 때는 Docker가 실행 중인 환경에서 실제 Redis 통합 테스트를 추가로 실행한다.
+
+```powershell
+.\gradlew.bat integrationTest
+```
+
+PR CI는 단위 테스트와 Redis 통합 테스트를 모두 통과한 jar만 배포 workflow에 전달한다.
