@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [ "master", "develop" ]
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
   group: queue-ci-${{ github.event.pull_request.number || github.ref }}
@@ -30,3 +31,19 @@ jobs:
         run: |
           chmod +x ./gradlew
           ./gradlew test :queue-api:bootJar :queue-scheduler:bootJar --no-daemon
+
+      - name: Upload verified Queue API jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: queue-api-jar
+          path: queue-api/build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload verified Queue Scheduler jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: queue-scheduler-jar
+          path: queue-scheduler/build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 7
