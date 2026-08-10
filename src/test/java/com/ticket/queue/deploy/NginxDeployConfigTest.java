@@ -152,6 +152,7 @@ class NginxDeployConfigTest {
         String workflow = read(DEPLOY_WORKFLOW);
 
         assertThat(ci)
+                .contains("test integrationTest")
                 .contains(":queue-api:bootJar")
                 .contains(":queue-scheduler:bootJar")
                 .contains("name: queue-api-jar")
