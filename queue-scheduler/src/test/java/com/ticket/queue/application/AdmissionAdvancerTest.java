@@ -1,9 +1,12 @@
 package com.ticket.queue.application;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.ticket.queue.config.AdvancementProperties;
 import com.ticket.queue.domain.QueueAdvancementStore;
+import com.ticket.queue.domain.QueueAdvanceResult;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
@@ -21,7 +24,12 @@ class AdmissionAdvancerTest {
         QueueAdvancementStore queueAdvancementStore = org.mockito.Mockito.mock(QueueAdvancementStore.class);
         AdmissionAdvancer advancer = new AdmissionAdvancer(queueProperties, queueAdvancementStore);
 
-        advancer.advance(1L);
+        QueueAdvanceResult expected = QueueAdvanceResult.observed(2, 3, 50L);
+        when(queueAdvancementStore.advancePublicState(
+                1L, 2, 128, 50L, 200L, Duration.ofHours(24), 5_000L
+        )).thenReturn(expected);
+
+        QueueAdvanceResult actual = advancer.advance(1L);
 
         verify(queueAdvancementStore).advancePublicState(
                 1L,
@@ -32,6 +40,7 @@ class AdmissionAdvancerTest {
                 Duration.ofHours(24),
                 5_000L
         );
+        assertThat(actual).isEqualTo(expected);
     }
 
     @Test

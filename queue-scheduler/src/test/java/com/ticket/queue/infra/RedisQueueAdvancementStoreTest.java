@@ -9,6 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.ticket.queue.domain.QueueAdvanceResult;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,7 @@ class RedisQueueAdvancementStoreTest {
         RLock lock = mock(RLock.class);
         RMap<String, String> stateMap = mock(RMap.class);
         RedisQueueAdvancementStore store = new RedisQueueAdvancementStore(redissonClient);
+        long futureSlotId = Math.floorDiv(System.currentTimeMillis(), 50L) + 1_000L;
 
         when(redissonClient.getLock(RedisKey.advanceLock(1L))).thenReturn(lock);
         when(lock.tryLock(0L, 5_000L, TimeUnit.MILLISECONDS)).thenReturn(true);
@@ -58,11 +60,16 @@ class RedisQueueAdvancementStoreTest {
                 any(Object[].class)
         )).thenReturn(
                 List.of(0L, 2L, 0L, 0L, 2L),
-                List.of(1L, 2L, 0L, 0L, 2L)
+                List.of(2L, 3L, 0L, futureSlotId, 3L)
         );
 
-        store.advancePublicState(1L, 10, 1, 50L, 200L, Duration.ofHours(24), 5_000L);
+        QueueAdvanceResult result = store.advancePublicState(
+                1L, 10, 1, 50L, 200L, Duration.ofHours(24), 5_000L
+        );
 
+        assertThat(result.admittedCount()).isEqualTo(2);
+        assertThat(result.backlog()).isEqualTo(1L);
+        assertThat(result.oldestPendingSlotAgeMillis()).isZero();
         verify(stateMap).putAll(any(Map.class));
         verify(stateMap).expire(Duration.ofHours(24));
         verify(lock).unlock();
@@ -97,8 +104,12 @@ class RedisQueueAdvancementStoreTest {
                 List.of(3L, 4L, 0L, 1L, 4L)
         );
 
-        store.advancePublicState(1L, 3, 1, 50L, 200L, Duration.ofHours(24), 5_000L);
+        QueueAdvanceResult result = store.advancePublicState(
+                1L, 3, 1, 50L, 200L, Duration.ofHours(24), 5_000L
+        );
 
+        assertThat(result.admittedCount()).isEqualTo(3);
+        assertThat(result.backlog()).isEqualTo(1L);
         verify(script, times(2)).evalSha(
                 eq(RScript.Mode.READ_WRITE),
                 eq("advance-sha"),
