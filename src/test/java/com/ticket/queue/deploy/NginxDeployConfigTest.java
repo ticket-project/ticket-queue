@@ -135,7 +135,10 @@ class NginxDeployConfigTest {
         String compose = read(COMPOSE_CONFIG);
 
         assertThat(compose)
-                .contains("image: redis:7-alpine")
+                .contains("image: redis:7-alpine@sha256:")
+                .contains("image: nginx:1.27-alpine@sha256:")
+                .contains("image: gcr.io/datadoghq/agent:7.82.1@sha256:")
+                .doesNotContain("image: gcr.io/datadoghq/agent:latest")
                 .contains("container_name: ticket-queue-redis")
                 .contains("redis-data:/data")
                 .contains("command: redis-server --appendonly no")
