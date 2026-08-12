@@ -80,6 +80,10 @@ jobs:
             sudo mkdir -p /home/ubuntu/ticket-queue/nginx
             sudo mkdir -p /home/ubuntu/ticket-queue/certbot/www
             sudo mkdir -p /home/ubuntu/ticket-queue/datadog/conf.d/redisdb.d
+            sudo mkdir -p /home/ubuntu/ticket-queue/candidate/nginx
+            sudo mkdir -p /home/ubuntu/ticket-queue/candidate/datadog/conf.d/redisdb.d
+            sudo mkdir -p /home/ubuntu/ticket-queue/rollback/nginx
+            sudo mkdir -p /home/ubuntu/ticket-queue/rollback/datadog/conf.d/redisdb.d
             sudo chown -R "$USER:$USER" /home/ubuntu/ticket-queue
 
       - name: Upload docker compose config
@@ -90,7 +94,7 @@ jobs:
           key: ${{ secrets.AWS_VM_SSH_KEY }}
           port: ${{ secrets.AWS_VM_PORT || '22' }}
           source: "deploy/docker-compose.yml"
-          target: "/home/ubuntu/ticket-queue"
+          target: "/home/ubuntu/ticket-queue/candidate"
           strip_components: 1
           overwrite: true
 
@@ -102,7 +106,7 @@ jobs:
           key: ${{ secrets.AWS_VM_SSH_KEY }}
           port: ${{ secrets.AWS_VM_PORT || '22' }}
           source: "deploy/nginx/nginx.conf"
-          target: "/home/ubuntu/ticket-queue"
+          target: "/home/ubuntu/ticket-queue/candidate"
           strip_components: 1
           overwrite: true
 
@@ -114,7 +118,7 @@ jobs:
           key: ${{ secrets.AWS_VM_SSH_KEY }}
           port: ${{ secrets.AWS_VM_PORT || '22' }}
           source: "deploy/nginx/default.conf"
-          target: "/home/ubuntu/ticket-queue"
+          target: "/home/ubuntu/ticket-queue/candidate"
           strip_components: 1
           overwrite: true
 
@@ -126,7 +130,7 @@ jobs:
           key: ${{ secrets.AWS_VM_SSH_KEY }}
           port: ${{ secrets.AWS_VM_PORT || '22' }}
           source: "deploy/datadog/conf.d/redisdb.d/conf.yaml"
-          target: "/home/ubuntu/ticket-queue"
+          target: "/home/ubuntu/ticket-queue/candidate"
           strip_components: 1
           overwrite: true
 
@@ -138,18 +142,147 @@ jobs:
           key: ${{ secrets.AWS_VM_SSH_KEY }}
           port: ${{ secrets.AWS_VM_PORT || '22' }}
           script: |
-            set -e
+            set -Eeuo pipefail
             API_IMAGE="${{ secrets.DOCKER_USERNAME }}/ticket-queue-api:${{ github.sha }}"
             SCHEDULER_IMAGE="${{ secrets.DOCKER_USERNAME }}/ticket-queue-scheduler:${{ github.sha }}"
             DEPLOY_DIR="/home/ubuntu/ticket-queue"
+            CANDIDATE_DIR="$DEPLOY_DIR/candidate"
+            ROLLBACK_DIR="$DEPLOY_DIR/rollback"
+            DEPLOY_STARTED=0
+            HAS_PREVIOUS_CONFIG=0
+
+            container_image() {
+              sudo docker inspect "$1" --format '{{.Config.Image}}' 2>/dev/null || true
+            }
+
+            container_dd_version() {
+              sudo docker inspect "$1" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+                | sed -n 's/^DD_VERSION=//p' \
+                | head -n 1
+            }
+
+            compose_up() {
+              sudo env \
+                QUEUE_API_DOCKER_IMAGE="$1" \
+                QUEUE_SCHEDULER_DOCKER_IMAGE="$2" \
+                DD_VERSION="$3" \
+                docker compose -f "$DEPLOY_DIR/docker-compose.yml" up -d --remove-orphans
+            }
+
+            wait_for_healthy() {
+              container="$1"
+              for attempt in $(seq 1 36); do
+                status="$(sudo docker inspect "$container" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' 2>/dev/null || true)"
+                case "$status" in
+                  healthy|running)
+                    echo "$container is $status"
+                    return 0
+                    ;;
+                  exited|dead)
+                    sudo docker logs --tail=100 "$container" || true
+                    return 1
+                    ;;
+                esac
+                sleep 5
+              done
+              echo "$container did not become healthy"
+              sudo docker logs --tail=100 "$container" || true
+              return 1
+            }
+
+            restore_previous_config() {
+              if [ "$HAS_PREVIOUS_CONFIG" -ne 1 ]; then
+                return 0
+              fi
+              sudo cp "$ROLLBACK_DIR/docker-compose.yml" "$DEPLOY_DIR/docker-compose.yml"
+              sudo cp "$ROLLBACK_DIR/nginx/nginx.conf" "$DEPLOY_DIR/nginx/nginx.conf"
+              sudo cp "$ROLLBACK_DIR/nginx/default.conf" "$DEPLOY_DIR/nginx/default.conf"
+              sudo cp "$ROLLBACK_DIR/datadog/conf.d/redisdb.d/conf.yaml" "$DEPLOY_DIR/datadog/conf.d/redisdb.d/conf.yaml"
+            }
+
+            rollback() {
+              exit_code=$?
+              trap - ERR
+              if [ "$DEPLOY_STARTED" -ne 1 ]; then
+                exit "$exit_code"
+              fi
+
+              echo "candidate deploy failed; restoring previous Queue release"
+              set +e
+              restore_previous_config
+              restore_result=$?
+              if [ "$restore_result" -ne 0 ]; then
+                echo "rollback config restore failed with exit code $restore_result"
+                exit "$exit_code"
+              fi
+              if [ -n "$PREVIOUS_API_IMAGE" ] && [ -n "$PREVIOUS_SCHEDULER_IMAGE" ]; then
+                compose_up "$PREVIOUS_API_IMAGE" "$PREVIOUS_SCHEDULER_IMAGE" "$PREVIOUS_DD_VERSION"
+                rollback_result=$?
+                if [ "$rollback_result" -eq 0 ]; then
+                  wait_for_healthy ticket-queue-api || rollback_result=$?
+                  wait_for_healthy ticket-queue-scheduler || rollback_result=$?
+                fi
+                if [ "$rollback_result" -eq 0 ]; then
+                  echo "rollback completed: $PREVIOUS_API_IMAGE / $PREVIOUS_SCHEDULER_IMAGE"
+                else
+                  echo "rollback failed with exit code $rollback_result"
+                fi
+              else
+                echo "no previous release exists; failed candidate containers are preserved for diagnosis"
+              fi
+              exit "$exit_code"
+            }
+
+            trap rollback ERR
 
             cd "$DEPLOY_DIR"
             test -f .env
-            test -f docker-compose.yml
+            test -f "$CANDIDATE_DIR/docker-compose.yml"
+            test -f "$CANDIDATE_DIR/nginx/nginx.conf"
+            test -f "$CANDIDATE_DIR/nginx/default.conf"
+            test -f "$CANDIDATE_DIR/datadog/conf.d/redisdb.d/conf.yaml"
             sudo test -f /etc/letsencrypt/live/queue.oneticket.site/fullchain.pem || { echo "missing TLS certificate: /etc/letsencrypt/live/queue.oneticket.site/fullchain.pem"; exit 1; }
             sudo test -f /etc/letsencrypt/live/queue.oneticket.site/privkey.pem || { echo "missing TLS private key: /etc/letsencrypt/live/queue.oneticket.site/privkey.pem"; exit 1; }
+
+            PREVIOUS_API_IMAGE="$(container_image ticket-queue-api)"
+            PREVIOUS_SCHEDULER_IMAGE="$(container_image ticket-queue-scheduler)"
+            PREVIOUS_DD_VERSION="$(container_dd_version ticket-queue-api)"
+            if [ -z "$PREVIOUS_DD_VERSION" ]; then
+              PREVIOUS_DD_VERSION="${PREVIOUS_API_IMAGE##*:}"
+            fi
+
             echo "${{ secrets.DOCKER_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
             sudo docker pull "$API_IMAGE"
             sudo docker pull "$SCHEDULER_IMAGE"
-            sudo QUEUE_API_DOCKER_IMAGE="$API_IMAGE" QUEUE_SCHEDULER_DOCKER_IMAGE="$SCHEDULER_IMAGE" DD_VERSION="${{ github.sha }}" docker compose -f docker-compose.yml up -d --remove-orphans
+
+            if [ -f "$DEPLOY_DIR/docker-compose.yml" ]; then
+              sudo cp "$DEPLOY_DIR/docker-compose.yml" "$ROLLBACK_DIR/docker-compose.yml"
+              sudo cp "$DEPLOY_DIR/nginx/nginx.conf" "$ROLLBACK_DIR/nginx/nginx.conf"
+              sudo cp "$DEPLOY_DIR/nginx/default.conf" "$ROLLBACK_DIR/nginx/default.conf"
+              sudo cp "$DEPLOY_DIR/datadog/conf.d/redisdb.d/conf.yaml" "$ROLLBACK_DIR/datadog/conf.d/redisdb.d/conf.yaml"
+              HAS_PREVIOUS_CONFIG=1
+            fi
+
+            DEPLOY_STARTED=1
+            sudo cp "$CANDIDATE_DIR/docker-compose.yml" "$DEPLOY_DIR/docker-compose.yml"
+            sudo cp "$CANDIDATE_DIR/nginx/nginx.conf" "$DEPLOY_DIR/nginx/nginx.conf"
+            sudo cp "$CANDIDATE_DIR/nginx/default.conf" "$DEPLOY_DIR/nginx/default.conf"
+            sudo cp "$CANDIDATE_DIR/datadog/conf.d/redisdb.d/conf.yaml" "$DEPLOY_DIR/datadog/conf.d/redisdb.d/conf.yaml"
+
+            compose_up "$API_IMAGE" "$SCHEDULER_IMAGE" "${{ github.sha }}"
+            wait_for_healthy ticket-queue-api
+            wait_for_healthy ticket-queue-scheduler
+            curl --fail --silent --show-error --insecure \
+              --resolve queue.oneticket.site:443:127.0.0.1 \
+              https://queue.oneticket.site/api/v1/queue/performances/1/state \
+              >/dev/null
+
+            printf '%s\n' \
+              "sha=${{ github.sha }}" \
+              "api_image=$API_IMAGE" \
+              "scheduler_image=$SCHEDULER_IMAGE" \
+              "config_sha256=$(sha256sum "$DEPLOY_DIR/docker-compose.yml" | cut -d' ' -f1)" \
+              > "$DEPLOY_DIR/.last-successful-deploy.tmp"
+            sudo mv "$DEPLOY_DIR/.last-successful-deploy.tmp" "$DEPLOY_DIR/.last-successful-deploy"
+            trap - ERR
             sudo docker image prune -f

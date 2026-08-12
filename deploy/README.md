@@ -109,10 +109,16 @@ master push
 -> ticket-queue-api:{commit SHA} 이미지 push
 -> ticket-queue-scheduler:{commit SHA} 이미지 push
 -> EC2에서 두 SHA 이미지 pull
+-> 현재 이미지와 compose/nginx/Datadog 설정을 rollback 디렉터리에 보관
 -> 같은 SHA의 두 이미지를 docker compose up -d로 교체
+-> API와 scheduler actuator health가 모두 UP인지 확인
+-> Nginx를 통한 public state read-only smoke 확인
+-> 실패하면 이전 두 이미지·이전 DD_VERSION·이전 설정으로 자동 복구
 ```
 
-`latest` 태그도 발행하지만 실제 배포에는 커밋 SHA 태그를 사용합니다. 왜냐하면 한쪽 이미지만 새 버전으로 바뀌면 Redis key/Lua 규약이 어긋날 수 있기 때문입니다.
+workflow는 `latest` 태그를 발행하지 않고 커밋 SHA 태그만 사용합니다. 한쪽 이미지만 새 버전으로 바뀌면 Redis key/Lua 규약이 어긋날 수 있으므로 API와 scheduler를 같은 SHA 단위로 검증·배포·롤백합니다.
+
+성공한 배포의 SHA, 두 이미지, compose checksum은 `/home/ubuntu/ticket-queue/.last-successful-deploy`에 기록됩니다. 자동 롤백도 실패하면 workflow를 실패 상태로 유지하고 컨테이너 로그를 남기므로, 운영자가 이전 SHA를 확인해 수동으로 복구할 수 있습니다. 최초 배포처럼 이전 이미지가 없는 경우에는 되돌릴 대상이 없으므로 실패한 candidate를 진단용으로 보존합니다.
 
 ## 확인
 
