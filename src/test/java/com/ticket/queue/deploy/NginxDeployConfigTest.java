@@ -70,6 +70,7 @@ class NginxDeployConfigTest {
                 .contains("image: ${QUEUE_API_DOCKER_IMAGE:?QUEUE_API_DOCKER_IMAGE is required}")
                 .contains("env_file:")
                 .contains("\"8090:8090\"")
+                .contains("http://localhost:8090/actuator/health")
                 .contains("DD_SERVICE: ticket-queue-api");
         assertCommonQueuePolicyEnvironment(api);
 
@@ -80,6 +81,7 @@ class NginxDeployConfigTest {
                 .contains("QUEUE_ADVANCE_INTERVAL_MS")
                 .contains("DD_SERVICE: ticket-queue-scheduler")
                 .contains("- \"8091\"")
+                .contains("http://localhost:8091/actuator/health")
                 .doesNotContain("env_file:")
                 .doesNotContain("ports:")
                 .doesNotContain("JWT_SECRET")
@@ -173,10 +175,18 @@ class NginxDeployConfigTest {
                 .contains("/ticket-queue-scheduler:${{ github.sha }}")
                 .contains("API_IMAGE=\"${{ secrets.DOCKER_USERNAME }}/ticket-queue-api:${{ github.sha }}\"")
                 .contains("SCHEDULER_IMAGE=\"${{ secrets.DOCKER_USERNAME }}/ticket-queue-scheduler:${{ github.sha }}\"")
-                .contains("QUEUE_API_DOCKER_IMAGE=\"$API_IMAGE\"")
-                .contains("QUEUE_SCHEDULER_DOCKER_IMAGE=\"$SCHEDULER_IMAGE\"")
-                .contains("DD_VERSION=\"${{ github.sha }}\"")
+                .contains("QUEUE_API_DOCKER_IMAGE=\"$1\"")
+                .contains("QUEUE_SCHEDULER_DOCKER_IMAGE=\"$2\"")
+                .contains("DD_VERSION=\"$3\"")
+                .contains("compose_up \"$API_IMAGE\" \"$SCHEDULER_IMAGE\" \"${{ github.sha }}\"")
                 .contains("DEPLOY_DIR=\"/home/ubuntu/ticket-queue\"")
+                .contains("trap rollback ERR")
+                .contains("PREVIOUS_API_IMAGE=\"$(container_image ticket-queue-api)\"")
+                .contains("PREVIOUS_SCHEDULER_IMAGE=\"$(container_image ticket-queue-scheduler)\"")
+                .contains("wait_for_healthy ticket-queue-api")
+                .contains("wait_for_healthy ticket-queue-scheduler")
+                .contains("https://queue.oneticket.site/api/v1/queue/performances/1/state")
+                .contains(".last-successful-deploy")
                 .contains("environment: aws-queue")
                 .doesNotContain("DOCKER_IMAGE=\"$IMAGE\"")
                 .doesNotContain("AZURE_VM");
