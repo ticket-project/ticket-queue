@@ -32,11 +32,9 @@ public class AdmissionService {
     private final QueueProperties queueProperties;
     private final UuidSupplier uuidSupplier;
     private final QueueShardSlotCalculator queueShardSlotCalculator;
-    private final QueueAdmissionMetrics queueAdmissionMetrics;
 
     public JoinResponse join(final Long performanceId, final AuthenticatedMember member) {
         JoinResult join = joinState(performanceId, member);
-        queueAdmissionMetrics.recordJoin(join.created());
         String queueToken = issueQueueToken(performanceId, join, member);
 
         return JoinResponse.waiting(performanceId, join, queueToken, queueProperties.getJoinPollAfterMs());
@@ -47,23 +45,11 @@ public class AdmissionService {
     }
 
     public EnterResponse enter(final Long performanceId, final String queueToken) {
-        QueueTokenClaims claims;
-        try {
-            claims = verifyQueueToken(queueToken);
-        } catch (ResponseStatusException exception) {
-            queueAdmissionMetrics.recordInvalidToken();
-            throw exception;
-        }
-        try {
-            verifyPerformance(performanceId, claims);
-        } catch (ResponseStatusException exception) {
-            queueAdmissionMetrics.recordPerformanceMismatch(claims.legacy());
-            throw exception;
-        }
+        QueueTokenClaims claims = verifyQueueToken(queueToken);
+        verifyPerformance(performanceId, claims);
 
         String admissionToken = issueAdmissionToken(performanceId, claims);
         EnterResult result = enterState(performanceId, claims, admissionToken);
-        queueAdmissionMetrics.recordEnter(claims.legacy(), result.status());
 
         return switch (result.status()) {
             case ADMITTED -> EnterResponse.active(

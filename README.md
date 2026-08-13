@@ -242,9 +242,6 @@ Real secrets stay in `/home/ubuntu/ticket-queue/.env` on the EC2 instance. GitHu
 
 See `deploy/README.md` for EC2 setup and required GitHub Secrets.
 
-Admission과 scheduler 운영 지표의 이름, 제한된 태그 값, 장애 판독 순서는
-[`docs/observability.md`](docs/observability.md)에 정리합니다.
-
 ## 남은 운영 검증
 
 기본 `advanceBatchSize=500`, `advanceIntervalMs=1000`은 측정 결과가 아닙니다. Core 실제 예매 흐름의 마지막 안정 구간을 찾은 뒤 여유를 둔 값으로 조정합니다.

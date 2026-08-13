@@ -20,7 +20,6 @@ import com.ticket.queue.domain.JoinResult;
 import com.ticket.queue.domain.PublicState;
 import com.ticket.queue.domain.QueueShardSlot;
 import com.ticket.queue.domain.UuidSupplier;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -52,7 +51,6 @@ class AdmissionServiceTest {
 
     private QueueShardSlot expectedShardSlot;
     private AdmissionService service;
-    private SimpleMeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
@@ -69,7 +67,6 @@ class AdmissionServiceTest {
                 Clock.fixed(Instant.ofEpochMilli(1_234_567L), ZoneOffset.UTC)
         );
         expectedShardSlot = shardSlotCalculator.calculate(1L, 10L);
-        meterRegistry = new SimpleMeterRegistry();
         service = new AdmissionService(
                 admissionStateStore,
                 queueTokenService,
@@ -77,8 +74,7 @@ class AdmissionServiceTest {
                 redirectProperties,
                 queueProperties,
                 uuidSupplier,
-                shardSlotCalculator,
-                new QueueAdmissionMetrics(meterRegistry)
+                shardSlotCalculator
         );
     }
 
@@ -126,48 +122,6 @@ class AdmissionServiceTest {
         assertThat(response.slotStartMillis()).isEqualTo(expectedShardSlot.slotStartMillis());
         assertThat(response.status()).isEqualTo("WAITING");
         assertThat(response.queueToken()).isEqualTo("queue-token");
-        assertThat(counter("queue.admission.join", "result", "created")).isEqualTo(1.0);
-    }
-
-    @Test
-    void join_records_duplicate_result_without_identifier_tags() {
-        AuthenticatedMember member = new AuthenticatedMember(10L, "MEMBER");
-        UUID queueUuid = UUID.fromString("00000000-0000-0000-0000-000000000001");
-        when(uuidSupplier.get()).thenReturn(queueUuid);
-        when(admissionStateStore.joinQueue(
-                eq(1L),
-                anyString(),
-                eq(queueUuid.toString()),
-                eq(expectedShardSlot),
-                eq(Duration.ofHours(24))
-        )).thenReturn(new JoinResult(
-                1L,
-                queueUuid.toString(),
-                expectedShardSlot.shardId(),
-                42L,
-                expectedShardSlot.slotId(),
-                expectedShardSlot.slotStartMillis(),
-                false
-        ));
-        when(queueTokenService.issue(
-                new QueueTokenClaims(
-                        1L,
-                        queueUuid.toString(),
-                        expectedShardSlot.shardId(),
-                        42L,
-                        expectedShardSlot.slotId(),
-                        10L
-                ),
-                Duration.ofHours(24)
-        )).thenReturn("queue-token");
-
-        service.join(1L, member);
-
-        assertThat(counter("queue.admission.join", "result", "duplicate")).isEqualTo(1.0);
-        assertThat(meterRegistry.getMeters()).allSatisfy(meter -> assertThat(meter.getId().getTags())
-                .noneMatch(tag -> tag.getKey().equals("performanceId")
-                        || tag.getKey().equals("queueId")
-                        || tag.getKey().equals("memberId")));
     }
 
     @Test
@@ -216,11 +170,6 @@ class AdmissionServiceTest {
         assertThatExceptionOfType(ResponseStatusException.class)
                 .isThrownBy(() -> service.enter(1L, "queue-token"))
                 .satisfies(exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
-        assertThat(counter(
-                "queue.admission.enter",
-                "path", "sharded",
-                "result", "not_admitted"
-        )).isEqualTo(1.0);
     }
 
     @Test
@@ -244,11 +193,6 @@ class AdmissionServiceTest {
         assertThat(response.admissionToken()).isEqualTo("admission-token");
         assertThat(response.expiresAtMillis()).isEqualTo(1_717_000_900_000L);
         assertThat(response.redirectUrl()).isEqualTo("/booking/seat?performanceId=1");
-        assertThat(counter(
-                "queue.admission.enter",
-                "path", "sharded",
-                "result", "admitted"
-        )).isEqualTo(1.0);
     }
 
     @Test
@@ -276,11 +220,6 @@ class AdmissionServiceTest {
                 eq("candidate-admission-token"),
                 eq(Duration.ofMinutes(15))
         );
-        assertThat(counter(
-                "queue.admission.enter",
-                "path", "legacy",
-                "result", "admitted"
-        )).isEqualTo(1.0);
     }
 
     @Test
@@ -321,31 +260,5 @@ class AdmissionServiceTest {
                 eq("candidate-admission-token"),
                 eq(Duration.ofMinutes(15))
         );
-        assertThat(counter(
-                "queue.admission.enter",
-                "path", "unknown",
-                "result", "invalid_token"
-        )).isEqualTo(1.0);
-    }
-
-    @Test
-    void enter_records_performance_mismatch_before_admission_token_issue() {
-        when(queueTokenService.verify("queue-token"))
-                .thenReturn(new QueueTokenClaims(2L, "queue-1", 17, 100L, 24_691L, 10L));
-
-        assertThatExceptionOfType(ResponseStatusException.class)
-                .isThrownBy(() -> service.enter(1L, "queue-token"))
-                .satisfies(exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
-
-        verify(admissionTokenIssuer, never()).issue(10L, 1L, "queue-1", Duration.ofMinutes(15));
-        assertThat(counter(
-                "queue.admission.enter",
-                "path", "sharded",
-                "result", "performance_mismatch"
-        )).isEqualTo(1.0);
-    }
-
-    private double counter(final String name, final String... tags) {
-        return meterRegistry.get(name).tags(tags).counter().count();
     }
 }
