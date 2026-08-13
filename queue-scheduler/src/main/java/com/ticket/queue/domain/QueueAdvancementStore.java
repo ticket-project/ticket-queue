@@ -7,7 +7,7 @@ public interface QueueAdvancementStore {
 
     Set<Long> findWaitingPerformanceIds();
 
-    QueueAdvanceResult advancePublicState(
+    void advancePublicState(
             Long performanceId,
             int advanceBatchSize,
             int shardCount,

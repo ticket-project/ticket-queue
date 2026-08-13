@@ -4,7 +4,6 @@ import static com.ticket.queue.infra.RedisScriptLoader.load;
 import static com.ticket.queue.infra.RedisValues.asLong;
 import static com.ticket.queue.infra.RedisValues.parseLong;
 
-import com.ticket.queue.domain.QueueAdvanceResult;
 import com.ticket.queue.domain.QueueAdvancementStore;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -57,7 +56,7 @@ public class RedisQueueAdvancementStore implements QueueAdvancementStore {
     }
 
     @Override
-    public QueueAdvanceResult advancePublicState(
+    public void advancePublicState(
             final Long performanceId,
             final int advanceBatchSize,
             final int shardCount,
@@ -75,20 +74,18 @@ public class RedisQueueAdvancementStore implements QueueAdvancementStore {
                 || stateTtl.isZero()
                 || stateTtl.isNegative()
                 || refreshAfterMs <= 0) {
-            return QueueAdvanceResult.skipped();
+            return;
         }
 
         RLock lock = redissonClient.getLock(RedisKey.advanceLock(performanceId));
         if (!tryAdvanceLock(lock)) {
-            return QueueAdvanceResult.skipped();
+            return;
         }
         try {
             List<ShardQueueState> states = readShardStates(performanceId, shardCount, stateTtl);
             int rrCursor = readRoundRobinCursor(performanceId, shardCount);
             int remaining = advanceBatchSize;
-            int admittedCount = 0;
-            long nowMillis = System.currentTimeMillis();
-            long lastClosedSlotId = Math.floorDiv(nowMillis - slotCloseGraceMillis, slotSizeMillis);
+            long lastClosedSlotId = Math.floorDiv(System.currentTimeMillis() - slotCloseGraceMillis, slotSizeMillis);
 
             while (remaining > 0) {
                 long slotId = nextClosedSlotId(states, lastClosedSlotId);
@@ -102,43 +99,16 @@ public class RedisQueueAdvancementStore implements QueueAdvancementStore {
                 }
                 applyAdvancePlan(performanceId, states, plan, stateTtl);
                 remaining -= plan.advancedCount();
-                admittedCount += plan.advancedCount();
                 rrCursor = plan.nextCursor();
             }
 
             publishPublicState(performanceId, states, shardCount, slotSizeMillis, refreshAfterMs, rrCursor, stateTtl);
             removeWaitingPerformanceIfNoPendingShard(states, performanceId);
-            return QueueAdvanceResult.observed(
-                    admittedCount,
-                    backlog(states),
-                    oldestPendingSlotAgeMillis(states, slotSizeMillis, nowMillis)
-            );
         } finally {
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
             }
         }
-    }
-
-    private long backlog(final List<ShardQueueState> states) {
-        return states.stream()
-                .mapToLong(state -> Math.max(0L, state.tailSeq() - state.servingSeq()))
-                .sum();
-    }
-
-    private long oldestPendingSlotAgeMillis(
-            final List<ShardQueueState> states,
-            final long slotSizeMillis,
-            final long nowMillis
-    ) {
-        return states.stream()
-                .filter(ShardQueueState::hasPendingSlot)
-                .mapToLong(ShardQueueState::firstSlotId)
-                .min()
-                .stream()
-                .map(slotId -> Math.max(0L, nowMillis - slotId * slotSizeMillis))
-                .findFirst()
-                .orElse(0L);
     }
 
     private List<ShardQueueState> readShardStates(
