@@ -31,16 +31,43 @@ reviews:
     - "!.idea/**"
     - "!.backup/**"
   path_instructions:
-    - path: "src/main/java/**"
+    - path: "queue-api/src/main/java/**"
       instructions: |
         - 항상 한국어로 리뷰하세요.
-        - 대기열 상태 전이, Redis key 전략, TTL/만료 처리, scheduler 정합성, admission token 흐름을 우선 확인하세요.
-        - public state 발행, 파일 저장 경로, Redis Lua script 로딩, 운영 환경 변수 불일치 가능성을 함께 확인하세요.
+        - join/state/enter 요청 경로의 인증 경계를 확인하세요. /state는 공개 API라 사용자별 정보를 담으면 안 됩니다.
+        - queue token과 admission token의 발급·검증, 재시도 멱등성, shard와 slot 계산을 우선 확인하세요.
+        - /join hot path가 public state projection을 쓰지 않는지 확인하세요. public state는 scheduler가 갱신합니다.
+        - queue-scheduler를 의존하는 코드나 @EnableScheduling이 들어오면 경계 위반입니다.
         - 단순 스타일보다 실제 장애 시나리오와 회귀 위험을 중심으로 지적하세요.
-    - path: "src/test/java/**"
+    - path: "queue-scheduler/src/main/java/**"
+      instructions: |
+        - 항상 한국어로 리뷰하세요.
+        - shard별 serving sequence 전진, closed slot 판정, round-robin 공정성, public state 갱신을 우선 확인하세요.
+        - advanceBatchSize와 advanceIntervalMs는 함께 유입량을 결정합니다. 하나만 바뀌었으면 초당 입장량 근거를 요구하세요.
+        - 분산 락 범위 안에서 외부 I/O가 늘어나는 변경, 전진과 token 발급의 순서·멱등성을 확인하세요.
+        - queue-api를 의존하는 코드가 들어오면 경계 위반입니다.
+    - path: "queue-redis/src/main/**"
+      instructions: |
+        - 항상 한국어로 리뷰하세요.
+        - Redis key 형식과 hash tag, TTL, Redisson 설정, Lua script 로딩 경로를 확인하세요.
+        - hash tag를 바꾸면 같은 Lua script에서 원자적으로 다뤄야 하는 key가 같은 slot에 남는지 확인하세요.
+        - Lua script를 수정하면 반환 값의 형태와 개수가 Java 쪽 파싱과 맞는지 확인하고, 통합 테스트를 요구하세요.
+        - 이 모듈에 Spring Boot 플러그인이나 실행 코드가 들어오면 경계 위반입니다.
+    - path: "**/src/test/java/**"
       instructions: |
         - 항상 한국어로 리뷰하세요.
         - Redis 상태 전이, token 검증, scheduler, public state 발행에 대한 회귀 테스트가 충분한지 확인하세요.
+        - 테스트 메서드 이름은 영어 snake_case 관례를 따릅니다.
+        - 루트 src/test의 배포 구조 검증 테스트를 지워서 통과시키는 변경은 지적하세요.
+    - path: "src/integrationTest/java/**"
+      instructions: |
+        - 항상 한국어로 리뷰하세요.
+        - Redis key·TTL·Lua 또는 API와 scheduler 사이의 상태 계약 변경에 대응하는 통합 테스트가 있는지 확인하세요.
+    - path: "src/test/java/com/ticket/queue/deploy/**"
+      instructions: |
+        - 항상 한국어로 리뷰하세요.
+        - 이 테스트들은 모듈 경계와 배포·워크플로 설정의 형태를 고정합니다.
+        - 설정을 바꾸면서 테스트를 함께 고쳤는지, 아니면 테스트만 느슨하게 만들었는지 구분해서 지적하세요.
     - path: ".github/**"
       instructions: |
         - 항상 한국어로 리뷰하세요.
@@ -52,6 +79,7 @@ reviews:
     - path: "**/*"
       instructions: |
         - 항상 한국어로 리뷰하세요.
+        - 이 저장소의 규칙은 루트 AGENTS.md와 docs/가 기준입니다. 규칙 판단이 필요하면 그 문서를 따르세요.
         - 패치만 보지 말고 주변 코드와 관련 테스트까지 확인하세요.
         - 버그, 보안, 동시성, 회귀 위험, 테스트 공백을 우선 지적하세요.
   tools:
