@@ -8,3 +8,6 @@ build/
 bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
+
+# Claude Code 개인 설정 (공유 설정은 .claude/settings.json)
+.claude/settings.local.json
