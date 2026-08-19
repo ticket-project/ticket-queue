@@ -3,6 +3,18 @@ name: Queue CI/CD (Docker Hub)
 on:
   push:
     branches: [ "master" ]
+    # 배포 산출물에 들어가지 않는 파일만 무시한다. 각 Dockerfile은 bootJar만 COPY하므로
+    # 문서와 에이전트·리뷰 설정 변경은 이미지 내용을 바꾸지 않는다.
+    # deploy/ 아래의 docker-compose, nginx, datadog 설정과 .github/workflows는 제외하지 않는다.
+    # 이들은 EC2로 업로드되거나 배포 절차 자체를 정의하므로 항상 배포를 트리거해야 한다.
+    # 무시 대상만 담긴 push는 workflow가 아예 실행되지 않으므로 컨테이너 교체도 일어나지 않는다.
+    # 필요하면 workflow_dispatch로 언제든 수동 배포할 수 있다.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.claude/**'
+      - '.coderabbit.yaml'
+      - '.gitignore'
   workflow_dispatch:
 
 concurrency:
