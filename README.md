@@ -145,7 +145,6 @@ q:{performanceId:shardId}:pending-slots         # 아직 처리되지 않은 slo
 q:{performanceId:shardId}:waiting-marker        # waiting set 재등록을 줄이는 shard marker; 10초
 q:{performanceId}:state                         # public state projection hash; defaultQueueTtl
 q:{performanceId}:entered:{queueId}             # enter 멱등 marker hash; shoppingSessionTtl
-q:{performanceId}:queue:{queueId}               # 이전 queue ticket 호환 조회용; 새 join은 생성하지 않음
 queue:waiting:performances                       # scheduler scan 대상 performanceId set; TTL 없이 비면 제거
 ```
 

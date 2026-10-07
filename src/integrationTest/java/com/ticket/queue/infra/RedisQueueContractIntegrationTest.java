@@ -12,7 +12,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.redisson.Redisson;
-import org.redisson.api.RMap;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.StringCodec;
 import org.redisson.config.Config;
@@ -153,29 +152,6 @@ class RedisQueueContractIntegrationTest {
                 3L, "queue-a", 0, 1L, "admission-a", SESSION_TTL
         );
         assertThat(result.status()).isEqualTo(EnterResult.Status.EXPIRED);
-    }
-
-    @Test
-    void legacy_enter_uses_global_state_and_keeps_session_idempotent() {
-        RMap<String, String> publicState = redissonClient.getMap(RedisKey.publicState(4L), StringCodec.INSTANCE);
-        publicState.put("admittedUntilSeq", "1");
-        publicState.expire(QUEUE_TTL);
-        RMap<String, String> legacyTicket = redissonClient.getMap(
-                RedisKey.legacyQueue(4L, "legacy-queue"),
-                StringCodec.INSTANCE
-        );
-        legacyTicket.put("seq", "1");
-        legacyTicket.expire(QUEUE_TTL);
-
-        EnterResult admitted = admissionStore.enterLegacyQueue(
-                4L, "legacy-queue", 1L, "legacy-admission", SESSION_TTL
-        );
-        EnterResult retried = admissionStore.enterLegacyQueue(
-                4L, "legacy-queue", 1L, "different-token", SESSION_TTL
-        );
-
-        assertThat(admitted.status()).isEqualTo(EnterResult.Status.ADMITTED);
-        assertThat(retried).isEqualTo(admitted);
     }
 
     private QueueShardSlot closedSlot(final int shardId) {
