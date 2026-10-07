@@ -179,7 +179,6 @@ advance 이후에는 Redis의 public state가 갱신됩니다. 사용자는 `/st
 | `app.queue.slot-close-grace-millis` | `200` | slot 확정 전 대기 grace, scheduler 모듈 전용 |
 | `app.queue.join-poll-after-ms` | `1000` | join 응답 후 state 재조회 권장 간격 |
 | `app.queue.advance-interval-ms` | `1000` | scheduler 실행 간격(ms), scheduler 모듈 전용 |
-| `app.queue.redirect.ticketing-url-template` | `/booking/seat?performanceId={performanceId}` | 입장 후 redirect URL |
 
 | 환경변수 | 기본값 | 설명 |
 | --- | --- | --- |
