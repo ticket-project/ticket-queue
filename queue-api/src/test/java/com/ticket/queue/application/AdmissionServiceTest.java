@@ -18,7 +18,6 @@ import com.ticket.queue.domain.EnterResult;
 import com.ticket.queue.domain.JoinResult;
 import com.ticket.queue.domain.PublicState;
 import com.ticket.queue.domain.QueueShardSlot;
-import com.ticket.queue.domain.UuidSupplier;
 import com.ticket.queue.infra.RedisAdmissionStateStore;
 import java.time.Clock;
 import java.time.Duration;
@@ -46,9 +45,6 @@ class AdmissionServiceTest {
     @Mock
     private AdmissionTokenIssuer admissionTokenIssuer;
 
-    @Mock
-    private UuidSupplier uuidSupplier;
-
     private QueueShardSlot expectedShardSlot;
     private AdmissionService service;
 
@@ -73,7 +69,6 @@ class AdmissionServiceTest {
                 admissionTokenIssuer,
                 redirectProperties,
                 queueProperties,
-                uuidSupplier,
                 shardSlotCalculator
         );
     }
@@ -82,11 +77,10 @@ class AdmissionServiceTest {
     void join_issues_sequence_and_queue_token() {
         AuthenticatedMember member = new AuthenticatedMember(10L, "MEMBER");
         UUID queueUuid = UUID.fromString("00000000-0000-0000-0000-000000000001");
-        when(uuidSupplier.get()).thenReturn(queueUuid);
         when(admissionStateStore.joinQueue(
                 eq(1L),
                 anyString(),
-                eq(queueUuid.toString()),
+                anyString(),
                 eq(expectedShardSlot),
                 eq(Duration.ofHours(24))
         )).thenReturn(new JoinResult(
