@@ -5,6 +5,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
@@ -16,7 +17,7 @@ class SignedAdmissionTokenIssuerTest {
 
     @Test
     void issue_creates_member_bound_admission_token() {
-        SignedAdmissionTokenIssuer issuer = new SignedAdmissionTokenIssuer(queueAdmissionProperties());
+        SignedAdmissionTokenIssuer issuer = new SignedAdmissionTokenIssuer(queueAdmissionProperties(), Clock.systemUTC());
 
         String token = issuer.issue(10L, 1L, "queue-1", Duration.ofMinutes(15));
 

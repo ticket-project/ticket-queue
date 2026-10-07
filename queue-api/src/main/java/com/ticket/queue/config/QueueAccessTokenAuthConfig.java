@@ -1,5 +1,6 @@
 package com.ticket.queue.config;
 
+import java.time.Clock;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,7 +15,7 @@ public class QueueAccessTokenAuthConfig {
     }
 
     @Bean
-    public AccessTokenVerifier accessTokenVerifier(final QueueJwtProperties properties) {
-        return new QueueJwtTokenVerifier(properties);
+    public AccessTokenVerifier accessTokenVerifier(final QueueJwtProperties properties, final Clock clock) {
+        return new QueueJwtTokenVerifier(properties, clock);
     }
 }

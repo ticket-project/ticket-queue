@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Date;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,7 @@ class QueueJwtTokenVerifierTest {
 
     @Test
     void verify_restores_authenticated_member_from_bearer_access_token() {
-        QueueJwtTokenVerifier verifier = new QueueJwtTokenVerifier(properties());
+        QueueJwtTokenVerifier verifier = new QueueJwtTokenVerifier(properties(), Clock.systemUTC());
         String token = issueToken(10L, "MEMBER", Instant.now().plusSeconds(1800));
 
         AuthenticatedMember member = verifier.verify("Bearer " + token);
@@ -28,7 +29,7 @@ class QueueJwtTokenVerifierTest {
 
     @Test
     void verify_rejects_invalid_bearer_header() {
-        QueueJwtTokenVerifier verifier = new QueueJwtTokenVerifier(properties());
+        QueueJwtTokenVerifier verifier = new QueueJwtTokenVerifier(properties(), Clock.systemUTC());
 
         assertThatThrownBy(() -> verifier.verify("not-a-bearer-token"))
                 .isInstanceOf(ResponseStatusException.class)
