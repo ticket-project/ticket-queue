@@ -75,17 +75,7 @@ public class SignedQueueTokenService {
                 throw new QueueTokenException("queue token invalid");
             }
 
-            String signingInput = String.join(
-                    DELIMITER,
-                    parts[0],
-                    parts[1],
-                    parts[2],
-                    parts[3],
-                    parts[4],
-                    parts[5],
-                    parts[6],
-                    parts[7]
-            );
+            String signingInput = token.substring(0, token.lastIndexOf(DELIMITER));
             if (!MessageDigest.isEqual(
                     sign(signingInput).getBytes(StandardCharsets.US_ASCII),
                     parts[8].getBytes(StandardCharsets.US_ASCII)
