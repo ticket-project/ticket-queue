@@ -2,9 +2,8 @@ package com.ticket.queue.config;
 
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.support.WebDataBinderFactory;
+import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
@@ -24,17 +23,13 @@ public class AuthenticatedMemberArgumentResolver implements HandlerMethodArgumen
             final NativeWebRequest webRequest,
             final WebDataBinderFactory binderFactory
     ) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw unauthorized();
-        }
-        if (authentication.getPrincipal() instanceof AuthenticatedMember authenticatedMember) {
+        Object member = webRequest.getAttribute(
+                AccessTokenAuthenticationFilter.MEMBER_ATTRIBUTE,
+                RequestAttributes.SCOPE_REQUEST
+        );
+        if (member instanceof AuthenticatedMember authenticatedMember) {
             return authenticatedMember;
         }
-        throw unauthorized();
-    }
-
-    private ResponseStatusException unauthorized() {
-        return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authenticated member is required");
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authenticated member is required");
     }
 }
