@@ -313,16 +313,10 @@ public class RedisQueueAdvancementStore {
             final Long performanceId,
             final List<ShardQueueState> states
     ) {
-        List<CompletableFuture<Boolean>> futures = states.stream()
-                .map(ShardQueueState::shardId)
-                .map(shardId -> redissonClient
-                        .getBucket(RedisKey.shardWaitingMarker(performanceId, shardId), StringCodec.INSTANCE)
-                        .isExistsAsync()
-                        .toCompletableFuture())
-                .toList();
-        return futures.stream()
-                .map(CompletableFuture::join)
-                .anyMatch(Boolean::booleanValue);
+        String[] markerKeys = states.stream()
+                .map(state -> RedisKey.shardWaitingMarker(performanceId, state.shardId()))
+                .toArray(String[]::new);
+        return redissonClient.getKeys().countExists(markerKeys) > 0;
     }
 
     private String performanceKey(final Long value) {
