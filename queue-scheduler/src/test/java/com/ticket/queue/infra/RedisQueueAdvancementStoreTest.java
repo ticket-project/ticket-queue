@@ -28,7 +28,6 @@ class RedisQueueAdvancementStoreTest {
         String script = RedisScriptLoader.load("redis/advance_queue_state.lua");
 
         assertThat(script).contains("local tail_seq = tonumber(redis.call('GET', KEYS[4]) or '0')");
-        assertThat(script).contains("'tailSeq'");
         assertThat(script).contains("redis.call('PEXPIRE', KEYS[1], ttl_millis)");
         assertThat(script).contains("redis.call('PEXPIRE', KEYS[4], ttl_millis)");
         assertThat(script).contains("first_pending_slot(serving_seq)");
@@ -56,8 +55,8 @@ class RedisQueueAdvancementStoreTest {
                 any(List.class),
                 any(Object[].class)
         )).thenReturn(
-                List.of(0L, 2L, 0L, 0L, 2L),
-                List.of(1L, 2L, 0L, 0L, 2L)
+                List.of(0L, 2L, 0L, 2L),
+                List.of(1L, 2L, 0L, 2L)
         );
 
         store.advancePublicState(1L, 10, 1, 50L, 200L, Duration.ofHours(24), 5_000L);
@@ -91,8 +90,8 @@ class RedisQueueAdvancementStoreTest {
                 any(List.class),
                 any(Object[].class)
         )).thenReturn(
-                List.of(0L, 3L, 0L, 0L, 3L),
-                List.of(3L, 4L, 0L, 1L, 4L)
+                List.of(0L, 3L, 0L, 3L),
+                List.of(3L, 4L, 1L, 4L)
         );
 
         store.advancePublicState(1L, 3, 1, 50L, 200L, Duration.ofHours(24), 5_000L);

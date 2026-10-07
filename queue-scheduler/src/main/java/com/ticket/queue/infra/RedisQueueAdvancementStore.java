@@ -36,8 +36,6 @@ public class RedisQueueAdvancementStore {
     private static final String FIELD_SLOT_SIZE_MILLIS = "slotSizeMillis";
     private static final String FIELD_SERVING = "serving";
     private static final String FIELD_TAIL = "tail";
-    private static final String FIELD_ADMITTED_UNTIL_SEQ = "admittedUntilSeq";
-    private static final String FIELD_TAIL_SEQ = "tailSeq";
     private static final String FIELD_REFRESH_AFTER_MS = "refreshAfterMs";
     private static final String FIELD_RR_CURSOR = "rrCursor";
 
@@ -171,8 +169,7 @@ public class RedisQueueAdvancementStore {
                 asLong(result.get(0)),
                 asLong(result.get(1)),
                 asLong(result.get(2)),
-                asLong(result.get(3)),
-                asLong(result.get(4))
+                asLong(result.get(3))
         );
     }
 
@@ -264,22 +261,11 @@ public class RedisQueueAdvancementStore {
         values.put(FIELD_SLOT_SIZE_MILLIS, String.valueOf(slotSizeMillis));
         values.put(FIELD_SERVING, encodeShardMap(serving));
         values.put(FIELD_TAIL, encodeShardMap(tail));
-        values.put(FIELD_ADMITTED_UNTIL_SEQ, String.valueOf(maxValue(serving)));
-        values.put(FIELD_TAIL_SEQ, String.valueOf(maxValue(tail)));
         values.put(FIELD_REFRESH_AFTER_MS, String.valueOf(refreshAfterMs));
         values.put(FIELD_RR_CURSOR, String.valueOf(rrCursor));
-        values.put("serverTimeMillis", String.valueOf(System.currentTimeMillis()));
         RMap<String, String> stateMap = publicStateMap(performanceId);
         stateMap.putAll(values);
         stateMap.expire(ttlDuration(stateTtl));
-    }
-
-    private long maxValue(final Map<Integer, Long> values) {
-        return values.values()
-                .stream()
-                .mapToLong(Long::longValue)
-                .max()
-                .orElse(0L);
     }
 
     private boolean hasPending(final List<ShardQueueState> states) {
@@ -357,7 +343,6 @@ public class RedisQueueAdvancementStore {
             int shardId,
             long servingSeq,
             long tailSeq,
-            long activeCount,
             long firstSlotId,
             long firstSlotTail
     ) {
