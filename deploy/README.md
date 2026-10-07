@@ -65,12 +65,12 @@ QUEUE_DEFAULT_QUEUE_TTL=24h
 QUEUE_DEFAULT_REFRESH_AFTER_MS=5000
 QUEUE_SHARD_COUNT=128
 QUEUE_SLOT_SIZE_MILLIS=50
-QUEUE_SLOT_CLOSE_GRACE_MILLIS=200
 ```
 
 Scheduler 전용 환경변수:
 
 ```text
+QUEUE_SLOT_CLOSE_GRACE_MILLIS=200
 QUEUE_ADVANCE_BATCH_SIZE=500
 QUEUE_ADVANCE_INTERVAL_MS=1000
 ```
@@ -96,7 +96,7 @@ AWS_VM_PORT
 
 `AWS_VM_PORT`는 SSH가 22번 포트를 사용한다면 생략할 수 있습니다.
 
-Queue Server는 외부 GitHub Packages를 읽지 않는다. EC2 `.env`에는 Core access token 검증용 `JWT_SECRET`, `JWT_ISSUER`, `JWT_ACCESS_TOKEN_EXPIRATION_SECONDS`, queue/admission token secret, 공통 TTL·shard·slot 설정과 scheduler의 `QUEUE_ADVANCE_BATCH_SIZE`를 설정한다.
+Queue Server는 외부 GitHub Packages를 읽지 않는다. EC2 `.env`에는 Core access token 검증용 `JWT_SECRET`, `JWT_ISSUER`, queue/admission token secret, 공통 TTL·shard·slot 설정과 scheduler의 `QUEUE_ADVANCE_BATCH_SIZE`를 설정한다.
 
 Workflow는 `master` push에서 실행되고, GitHub Actions에서 수동 실행도 가능하다.
 

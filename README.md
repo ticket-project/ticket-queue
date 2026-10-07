@@ -176,7 +176,7 @@ advance 이후에는 Redis의 public state가 갱신됩니다. 사용자는 `/st
 | `app.queue.default-refresh-after-ms` | `5000` | 클라이언트 state 재조회 권장 간격 |
 | `app.queue.shard-count` | `128` | 회차별 queue shard 수 |
 | `app.queue.slot-size-millis` | `50` | 공정성 time slot 크기 |
-| `app.queue.slot-close-grace-millis` | `200` | slot 확정 전 대기 grace |
+| `app.queue.slot-close-grace-millis` | `200` | slot 확정 전 대기 grace, scheduler 모듈 전용 |
 | `app.queue.join-poll-after-ms` | `1000` | join 응답 후 state 재조회 권장 간격 |
 | `app.queue.advance-interval-ms` | `1000` | scheduler 실행 간격(ms), scheduler 모듈 전용 |
 | `app.queue.redirect.ticketing-url-template` | `/booking/seat?performanceId={performanceId}` | 입장 후 redirect URL |
@@ -188,12 +188,11 @@ advance 이후에는 Redis의 public state가 갱신됩니다. 사용자는 `/st
 | `QUEUE_DEFAULT_REFRESH_AFTER_MS` | `5000` | API와 scheduler가 공유하는 state 재조회 권장 간격 |
 | `QUEUE_SHARD_COUNT` | `128` | API와 scheduler가 공유하는 shard 수 |
 | `QUEUE_SLOT_SIZE_MILLIS` | `50` | API와 scheduler가 공유하는 slot 크기 |
-| `QUEUE_SLOT_CLOSE_GRACE_MILLIS` | `200` | API와 scheduler가 공유하는 slot 확정 grace |
+| `QUEUE_SLOT_CLOSE_GRACE_MILLIS` | `200` | scheduler의 slot 확정 grace |
 | `QUEUE_ADVANCE_BATCH_SIZE` | `500` | scheduler의 회차별 1회 전진 인원 |
 | `ADMISSION_TOKEN_SECRET_KEY` | 없음 | Ticket Server와 공유하는 admission token secret, 32바이트 이상 |
 | `JWT_SECRET` | 없음 | Core access token 검증용 JWT secret, 32바이트 이상 |
 | `JWT_ISSUER` | `ticket` | Core access token issuer |
-| `JWT_ACCESS_TOKEN_EXPIRATION_SECONDS` | `1800` | Core access token expiration seconds |
 | `QUEUE_ADVANCE_INTERVAL_MS` | `1000` | scheduler 실행 간격(ms) |
 
 로컬 실행 예시:
@@ -203,7 +202,6 @@ docker compose -f docker-compose.local.yml up -d redis
 
 $env:JWT_SECRET="local-access-token-secret-key-32bytes"
 $env:JWT_ISSUER="ticket"
-$env:JWT_ACCESS_TOKEN_EXPIRATION_SECONDS="1800"
 $env:ADMISSION_TOKEN_SECRET_KEY="local-admission-secret-key-32bytes"
 $env:QUEUE_TOKEN_SECRET="local-queue-token-secret-key-32bytes"
 

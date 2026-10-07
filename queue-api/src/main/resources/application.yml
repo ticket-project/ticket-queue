@@ -12,20 +12,12 @@ server:
 spring:
   application:
     name: ticket-queue-api
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info,prometheus
-  endpoint:
-    health:
-      probes:
-        enabled: true
   metrics:
     tags:
       service: ${DD_SERVICE:ticket-queue-api}
@@ -36,7 +28,6 @@ security:
   jwt:
     issuer: ${JWT_ISSUER:ticket}
     secret-key: ${JWT_SECRET}
-    access-token-expiration-seconds: ${JWT_ACCESS_TOKEN_EXPIRATION_SECONDS:1800}
   admission:
     secret-key: ${ADMISSION_TOKEN_SECRET_KEY}
 
@@ -46,5 +37,4 @@ app:
     default-refresh-after-ms: ${QUEUE_DEFAULT_REFRESH_AFTER_MS:5000}
     shard-count: ${QUEUE_SHARD_COUNT:128}
     slot-size-millis: ${QUEUE_SLOT_SIZE_MILLIS:50}
-    slot-close-grace-millis: ${QUEUE_SLOT_CLOSE_GRACE_MILLIS:200}
     queue-token-secret: ${QUEUE_TOKEN_SECRET}
