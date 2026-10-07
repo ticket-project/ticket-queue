@@ -148,8 +148,7 @@
 
 `.github/workflows/claude-code-review.yml`이 PR `opened`, `ready_for_review`, `reopened`에서 실행된다
 (draft는 제외). `claude.yml`은 본문이 `@claude`로 시작하는 코멘트에서 실행된다. 초안 상태로 올리려면
-draft로 만든다. 두 workflow의 형태는 `ClaudeWorkflowConfigTest`가 고정하므로 트리거를 바꾸면
-그 테스트를 함께 고친다.
+draft로 만든다.
 
 ### 순서
 

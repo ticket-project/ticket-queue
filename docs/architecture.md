@@ -69,8 +69,8 @@ queue-api ──> queue-redis <── queue-scheduler
 
 ### 그 밖의 배포 검증 테스트
 
-`NginxDeployConfigTest`, `QueueCdnCacheArchitectureTest`, `ClaudeWorkflowConfigTest`가 `deploy/` 설정과
-`.github/workflows/`의 형태를 고정한다. 해당 파일을 바꿀 때는 이 테스트가 무엇을 전제하는지 먼저 읽고,
+`NginxDeployConfigTest`, `QueueCdnCacheArchitectureTest`가 `deploy/` 설정의
+불변식을 고정한다. 해당 파일을 바꿀 때는 이 테스트가 무엇을 전제하는지 먼저 읽고,
 전제 자체를 바꿀 생각이면 테스트를 함께 고친다. 테스트만 지워서 통과시키지 않는다.
 
 ## Redis key 소유권
