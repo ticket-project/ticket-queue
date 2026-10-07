@@ -31,7 +31,6 @@ jobs:
     environment: aws-queue
     permissions:
       contents: read
-      packages: read
 
     steps:
       - name: Checkout
@@ -98,50 +97,14 @@ jobs:
             sudo mkdir -p /home/ubuntu/ticket-queue/rollback/datadog/conf.d/redisdb.d
             sudo chown -R "$USER:$USER" /home/ubuntu/ticket-queue
 
-      - name: Upload docker compose config
+      - name: Upload deploy configs
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.AWS_VM_HOST }}
           username: ${{ secrets.AWS_VM_USER }}
           key: ${{ secrets.AWS_VM_SSH_KEY }}
           port: ${{ secrets.AWS_VM_PORT || '22' }}
-          source: "deploy/docker-compose.yml"
-          target: "/home/ubuntu/ticket-queue/candidate"
-          strip_components: 1
-          overwrite: true
-
-      - name: Upload nginx main config
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.AWS_VM_HOST }}
-          username: ${{ secrets.AWS_VM_USER }}
-          key: ${{ secrets.AWS_VM_SSH_KEY }}
-          port: ${{ secrets.AWS_VM_PORT || '22' }}
-          source: "deploy/nginx/nginx.conf"
-          target: "/home/ubuntu/ticket-queue/candidate"
-          strip_components: 1
-          overwrite: true
-
-      - name: Upload nginx config
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.AWS_VM_HOST }}
-          username: ${{ secrets.AWS_VM_USER }}
-          key: ${{ secrets.AWS_VM_SSH_KEY }}
-          port: ${{ secrets.AWS_VM_PORT || '22' }}
-          source: "deploy/nginx/default.conf"
-          target: "/home/ubuntu/ticket-queue/candidate"
-          strip_components: 1
-          overwrite: true
-
-      - name: Upload Datadog Redis config
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.AWS_VM_HOST }}
-          username: ${{ secrets.AWS_VM_USER }}
-          key: ${{ secrets.AWS_VM_SSH_KEY }}
-          port: ${{ secrets.AWS_VM_PORT || '22' }}
-          source: "deploy/datadog/conf.d/redisdb.d/conf.yaml"
+          source: "deploy/docker-compose.yml,deploy/nginx/nginx.conf,deploy/nginx/default.conf,deploy/datadog/conf.d/redisdb.d/conf.yaml"
           target: "/home/ubuntu/ticket-queue/candidate"
           strip_components: 1
           overwrite: true
