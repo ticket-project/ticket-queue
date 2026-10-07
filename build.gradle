@@ -40,8 +40,6 @@ evaluationDependsOn(':queue-scheduler')
 
 sourceSets {
     integrationTest {
-        java.srcDir file('src/integrationTest/java')
-        resources.srcDir file('src/integrationTest/resources')
         compileClasspath += files(
                 project(':queue-api').sourceSets.main.output,
                 project(':queue-scheduler').sourceSets.main.output
@@ -70,10 +68,6 @@ dependencyManagement {
 
 dependencies {
     integrationTestImplementation 'org.testcontainers:testcontainers-junit-jupiter'
-}
-
-tasks.named('compileIntegrationTestJava') {
-    dependsOn ':queue-api:classes', ':queue-scheduler:classes'
 }
 
 tasks.register('integrationTest', Test) {
