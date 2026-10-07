@@ -90,7 +90,6 @@ class AdmissionServiceTest {
                 eq(expectedShardSlot),
                 eq(Duration.ofHours(24))
         )).thenReturn(new JoinResult(
-                1L,
                 queueUuid.toString(),
                 expectedShardSlot.shardId(),
                 42L,
