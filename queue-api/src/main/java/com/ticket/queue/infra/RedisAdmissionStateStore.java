@@ -60,12 +60,29 @@ public class RedisAdmissionStateStore {
         validateNotBlank(candidateQueueId, "candidateQueueId");
         validateShardSlot(shardSlot);
 
-        JoinScriptResult result = runJoinScript(performanceId, userIdHash, candidateQueueId, shardSlot, queueTtl);
-        if (result.shouldRegisterWaitingPerformance()) {
-            waitingPerformanceSet().add(performanceKey(performanceId));
+        List<Object> result = evalScript(
+                JOIN_QUEUE_SCRIPT,
+                RScript.ReturnType.LIST,
+                joinKeys(performanceId, userIdHash, candidateQueueId, shardSlot.shardId()),
+                candidateQueueId,
+                userIdHash,
+                Math.max(1L, queueTtl.toMillis()),
+                shardSlot.slotId(),
+                shardSlot.slotStartMillis(),
+                WAITING_MARKER_TTL_MILLIS
+        );
+        if (asLong(result.get(5)) == 1L) {
+            waitingPerformanceSet().add(String.valueOf(performanceId));
         }
 
-        return result.toJoinResult();
+        return new JoinResult(
+                asString(result.get(0)),
+                shardSlot.shardId(),
+                asLong(result.get(1)),
+                asLong(result.get(2)),
+                asLong(result.get(3)),
+                asLong(result.get(4)) == 1L
+        );
     }
 
     public PublicState readPublicState(final Long performanceId, final long refreshAfterMs) {
@@ -117,27 +134,6 @@ public class RedisAdmissionStateStore {
                 shoppingSessionTtl,
                 SESSION_ADMIT_ENABLED
         ));
-    }
-
-    private JoinScriptResult runJoinScript(
-            final Long performanceId,
-            final String userIdHash,
-            final String candidateQueueId,
-            final QueueShardSlot shardSlot,
-            final Duration queueTtl
-    ) {
-        List<Object> result = evalScript(
-                JOIN_QUEUE_SCRIPT,
-                RScript.ReturnType.LIST,
-                joinKeys(performanceId, userIdHash, candidateQueueId, shardSlot.shardId()),
-                candidateQueueId,
-                userIdHash,
-                ttlDuration(queueTtl).toMillis(),
-                shardSlot.slotId(),
-                shardSlot.slotStartMillis(),
-                WAITING_MARKER_TTL_MILLIS
-        );
-        return JoinScriptResult.from(performanceId, shardSlot.shardId(), result);
     }
 
     private List<Object> joinKeys(
@@ -211,9 +207,9 @@ public class RedisAdmissionStateStore {
         return evalScript(
                 ADMIT_QUEUE_SESSION_SCRIPT,
                 RScript.ReturnType.LIST,
-                sessionKeys(performanceId, queueId),
+                List.of(RedisKey.performanceEntered(performanceId, queueId)),
                 admissionToken,
-                ttlDuration(shoppingSessionTtl).toMillis(),
+                Math.max(1L, shoppingSessionTtl.toMillis()),
                 admitRequested
         );
     }
@@ -226,15 +222,6 @@ public class RedisAdmissionStateStore {
         return List.of(
                 RedisKey.shardState(performanceId, shardId),
                 RedisKey.shardQueue(performanceId, shardId, queueId)
-        );
-    }
-
-    private List<Object> sessionKeys(
-            final Long performanceId,
-            final String queueId
-    ) {
-        return List.of(
-                RedisKey.performanceEntered(performanceId, queueId)
         );
     }
 
@@ -291,14 +278,6 @@ public class RedisAdmissionStateStore {
         return redissonClient.getSet(RedisKey.waitingPerformances(), StringCodec.INSTANCE);
     }
 
-    private String performanceKey(final Long value) {
-        return String.valueOf(value);
-    }
-
-    private Duration ttlDuration(final Duration duration) {
-        return Duration.ofMillis(Math.max(1L, duration.toMillis()));
-    }
-
     private void validateShardSlot(final QueueShardSlot shardSlot) {
         if (shardSlot == null) {
             throw new IllegalArgumentException("shardSlot must not be null");
@@ -327,47 +306,6 @@ public class RedisAdmissionStateStore {
     private void validateNotBlank(final String value, final String name) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(name + " must not be blank");
-        }
-    }
-
-    private record JoinScriptResult(
-            Long performanceId,
-            String queueId,
-            int shardId,
-            long localSeq,
-            long slotId,
-            long slotStartMillis,
-            boolean created,
-            boolean shouldRegisterWaitingPerformance
-    ) {
-
-        private static JoinScriptResult from(
-                final Long performanceId,
-                final int shardId,
-                final List<Object> result
-        ) {
-            return new JoinScriptResult(
-                    performanceId,
-                    asString(result.get(0)),
-                    shardId,
-                    asLong(result.get(1)),
-                    asLong(result.get(2)),
-                    asLong(result.get(3)),
-                    asLong(result.get(4)) == 1L,
-                    result.size() > 5 && asLong(result.get(5)) == 1L
-            );
-        }
-
-        private JoinResult toJoinResult() {
-            return new JoinResult(
-                    performanceId,
-                    queueId,
-                    shardId,
-                    localSeq,
-                    slotId,
-                    slotStartMillis,
-                    created
-            );
         }
     }
 }
