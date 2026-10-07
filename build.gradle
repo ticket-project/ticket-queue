@@ -11,11 +11,27 @@ allprojects {
         mavenLocal()
         mavenCentral()
     }
-}
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+    plugins.withType(JavaPlugin).configureEach {
+        java {
+            toolchain {
+                languageVersion = JavaLanguageVersion.of(25)
+            }
+        }
+
+        dependencies {
+            compileOnly 'org.projectlombok:lombok'
+            annotationProcessor 'org.projectlombok:lombok'
+            testCompileOnly 'org.projectlombok:lombok'
+            testAnnotationProcessor 'org.projectlombok:lombok'
+
+            testImplementation 'org.springframework.boot:spring-boot-starter-test'
+            testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+        }
+
+        tasks.named('test') {
+            useJUnitPlatform()
+        }
     }
 }
 
@@ -53,17 +69,11 @@ dependencyManagement {
 }
 
 dependencies {
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     integrationTestImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.compilerArgs += '-parameters'
-}
-
-tasks.named('test') {
-    useJUnitPlatform()
 }
 
 tasks.named('compileIntegrationTestJava') {
