@@ -35,7 +35,7 @@ queue-api ──> queue-redis <── queue-scheduler
 | `com.ticket.queue.domain` | queue model과 port(`AdmissionStateStore`, `QueueAdvancementStore`) |
 | `com.ticket.queue.infra` | Redis Lua·Redisson 저장소, advance lock, signed token 발급 구현 |
 
-`queue-redis`의 `infra`에는 `RedisKey`, `RedisValues`, `RedisScriptLoader`, `RedissonConfig`처럼
+`queue-redis`의 `infra`에는 `RedisKey`, `RedisValues`, `RedisScriptLoader`처럼
 두 실행 모듈이 공유해야 하는 규약만 둔다. 특정 모듈만 쓰는 Redis 명령은 그 모듈의 `infra`에 둔다.
 
 ## 코드 위치 결정표
@@ -50,7 +50,7 @@ queue-api ──> queue-redis <── queue-scheduler
 | scheduler 실행 주기와 batch 설정 | `queue-scheduler` 의 `config` |
 | Redis key 형식과 hash tag | `queue-redis` |
 | Lua script 파일 | `queue-redis` 의 `src/main/resources/redis` |
-| Redisson 연결 설정 | `queue-redis` |
+| Redisson 연결 설정 | `queue-redis`의 `redisson-spring-boot-starter` 의존성. `spring.data.redis.*`로 자동 구성하며 별도 설정 클래스를 두지 않는다. 모든 Redisson 호출은 codec(`StringCodec.INSTANCE`)을 명시한다 |
 | 배포 구조와 nginx·CDN 설정 검증 | root project `src/test` |
 
 ## 아키텍처 규칙
