@@ -7,13 +7,9 @@ plugins {
 dependencies {
     implementation project(':queue-redis')
 
-    implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
-
-    implementation 'org.springframework:spring-context'
-    implementation 'org.springframework:spring-web'
 
     implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
