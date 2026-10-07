@@ -8,11 +8,10 @@
 --
 -- ARGV:
 -- 1 candidate queue id
--- 2 user id hash
--- 3 queue ttl millis
--- 4 slot id
--- 5 slot start millis
--- 6 waiting marker ttl millis
+-- 2 queue ttl millis
+-- 3 slot id
+-- 4 slot start millis
+-- 5 waiting marker ttl millis
 --
 -- Returns:
 -- queue_id, local_seq, slot_id, slot_start_millis, created, register_waiting_performance
@@ -35,18 +34,16 @@ if existing and existing ~= '' then
 end
 
 local queue_id = ARGV[1]
-local user_id_hash = ARGV[2]
-local ttl_millis = tonumber(ARGV[3])
-local slot_id = tonumber(ARGV[4])
-local slot_start_millis = tonumber(ARGV[5])
-local marker_ttl_millis = tonumber(ARGV[6])
-local time = redis.call('TIME')
-local now_millis = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
+local ttl_millis = tonumber(ARGV[2])
+local slot_id = tonumber(ARGV[3])
+local slot_start_millis = tonumber(ARGV[4])
+local marker_ttl_millis = tonumber(ARGV[5])
 local local_seq = redis.call('INCR', KEYS[1])
 redis.call('PEXPIRE', KEYS[1], ttl_millis)
-local ticket_value = queue_id .. '|' .. local_seq .. '|' .. slot_id .. '|' .. slot_start_millis .. '|' .. user_id_hash .. '|' .. now_millis
+-- enter_queue.lua는 두 번째 필드(local_seq)만 읽는다. 예전 6필드 ticket도 그대로 읽힌다.
+local ticket_value = queue_id .. '|' .. local_seq .. '|' .. slot_id .. '|' .. slot_start_millis
 
-redis.call('SET', KEYS[2], queue_id .. '|' .. local_seq .. '|' .. slot_id .. '|' .. slot_start_millis, 'PX', ttl_millis)
+redis.call('SET', KEYS[2], ticket_value, 'PX', ttl_millis)
 redis.call('SET', KEYS[3], ticket_value, 'PX', ttl_millis)
 
 redis.call('HSET', KEYS[4], tostring(slot_id), local_seq)

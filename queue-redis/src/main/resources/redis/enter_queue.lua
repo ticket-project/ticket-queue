@@ -18,8 +18,6 @@ if ticket_value and ticket_value ~= '' then
   if first and second then
     stored_local_seq = tonumber(string.sub(ticket_value, first + 1, second - 1)) or -1
   end
-else
-  stored_local_seq = tonumber(redis.call('HGET', KEYS[2], 'localSeq') or '-1')
 end
 
 if stored_local_seq ~= local_seq then
