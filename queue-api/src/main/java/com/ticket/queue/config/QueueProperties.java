@@ -2,7 +2,6 @@ package com.ticket.queue.config;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.PositiveOrZero;
 import java.time.Duration;
 import lombok.Getter;
 import lombok.Setter;
@@ -27,8 +26,6 @@ public class QueueProperties {
     private int shardCount = 128;
     @Positive
     private long slotSizeMillis = 50L;
-    @PositiveOrZero
-    private long slotCloseGraceMillis = 200L;
     @Positive
     private long joinPollAfterMs = 1_000L;
     private String queueTokenSecret;

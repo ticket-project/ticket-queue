@@ -51,7 +51,6 @@ class QueueJwtTokenVerifierTest {
         QueueJwtProperties properties = new QueueJwtProperties();
         properties.setIssuer("ticket");
         properties.setSecretKey(SECRET);
-        properties.setAccessTokenExpirationSeconds(1800L);
         return properties;
     }
 }

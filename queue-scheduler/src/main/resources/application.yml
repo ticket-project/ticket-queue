@@ -4,20 +4,12 @@ server:
 spring:
   application:
     name: ticket-queue-scheduler
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info,prometheus
-  endpoint:
-    health:
-      probes:
-        enabled: true
   metrics:
     tags:
       service: ${DD_SERVICE:ticket-queue-scheduler}
