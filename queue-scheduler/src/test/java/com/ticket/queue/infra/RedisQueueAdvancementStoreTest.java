@@ -49,10 +49,9 @@ class RedisQueueAdvancementStoreTest {
         when(redissonClient.getScript(StringCodec.INSTANCE)).thenReturn(script);
         when(redissonClient.<String, String>getMap(RedisKey.publicState(1L), StringCodec.INSTANCE))
                 .thenReturn(stateMap);
-        when(script.scriptLoad(anyString())).thenReturn("advance-sha");
-        when(script.evalSha(
+        when(script.eval(
                 eq(RScript.Mode.READ_WRITE),
-                eq("advance-sha"),
+                anyString(),
                 any(RScript.ReturnType.class),
                 any(List.class),
                 any(Object[].class)
@@ -85,10 +84,9 @@ class RedisQueueAdvancementStoreTest {
         when(redissonClient.<String, String>getMap(RedisKey.publicState(1L), StringCodec.INSTANCE))
                 .thenReturn(stateMap);
         when(stateMap.get("rrCursor")).thenReturn("0");
-        when(script.scriptLoad(anyString())).thenReturn("advance-sha");
-        when(script.evalSha(
+        when(script.eval(
                 eq(RScript.Mode.READ_WRITE),
-                eq("advance-sha"),
+                anyString(),
                 any(RScript.ReturnType.class),
                 any(List.class),
                 any(Object[].class)
@@ -99,9 +97,9 @@ class RedisQueueAdvancementStoreTest {
 
         store.advancePublicState(1L, 3, 1, 50L, 200L, Duration.ofHours(24), 5_000L);
 
-        verify(script, times(2)).evalSha(
+        verify(script, times(2)).eval(
                 eq(RScript.Mode.READ_WRITE),
-                eq("advance-sha"),
+                anyString(),
                 any(RScript.ReturnType.class),
                 any(List.class),
                 argsCaptor.capture()

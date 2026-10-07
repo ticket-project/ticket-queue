@@ -85,10 +85,9 @@ class RedisAdmissionStateStoreTest {
         when(redissonClient.getScript(StringCodec.INSTANCE)).thenReturn(script);
         when(redissonClient.<String>getSet(RedisKey.waitingPerformances(), StringCodec.INSTANCE))
                 .thenReturn(waitingPerformanceSet);
-        when(script.scriptLoad(anyString())).thenReturn("join-sha");
-        when(script.evalSha(
+        when(script.eval(
                 eq(RScript.Mode.READ_WRITE),
-                eq("join-sha"),
+                anyString(),
                 eq(RScript.ReturnType.LIST),
                 any(List.class),
                 any(Object[].class)
@@ -108,19 +107,12 @@ class RedisAdmissionStateStoreTest {
         assertThat(actual.slotId()).isEqualTo(24_691L);
         assertThat(actual.slotStartMillis()).isEqualTo(1_234_550L);
         assertThat(actual.created()).isTrue();
-        verify(script).evalSha(
-                eq(RScript.Mode.READ_WRITE),
-                eq("join-sha"),
-                eq(RScript.ReturnType.LIST),
-                keysCaptor.capture(),
-                argsCaptor.capture()
-        );
-        verify(script, never()).eval(
+        verify(script).eval(
                 eq(RScript.Mode.READ_WRITE),
                 anyString(),
                 eq(RScript.ReturnType.LIST),
-                any(List.class),
-                any(Object[].class)
+                keysCaptor.capture(),
+                argsCaptor.capture()
         );
         assertThat(keysCaptor.getValue())
                 .containsExactly(
@@ -147,10 +139,9 @@ class RedisAdmissionStateStoreTest {
         when(redissonClient.getScript(StringCodec.INSTANCE)).thenReturn(script);
         when(redissonClient.<String>getSet(RedisKey.waitingPerformances(), StringCodec.INSTANCE))
                 .thenReturn(waitingPerformanceSet);
-        when(script.scriptLoad(anyString())).thenReturn("join-sha");
-        when(script.evalSha(
+        when(script.eval(
                 eq(RScript.Mode.READ_WRITE),
-                eq("join-sha"),
+                anyString(),
                 eq(RScript.ReturnType.LIST),
                 any(List.class),
                 any(Object[].class)
@@ -210,8 +201,7 @@ class RedisAdmissionStateStoreTest {
         ArgumentCaptor<Object[]> argsCaptor = ArgumentCaptor.forClass(Object[].class);
 
         when(redissonClient.getScript(StringCodec.INSTANCE)).thenReturn(script);
-        when(script.scriptLoad(anyString())).thenReturn("enter-sha");
-        when(script.evalSha(
+        when(script.eval(
                 eq(RScript.Mode.READ_WRITE),
                 anyString(),
                 eq(RScript.ReturnType.LIST),
@@ -233,7 +223,7 @@ class RedisAdmissionStateStoreTest {
         );
 
         assertThat(actual.status()).isEqualTo(EnterResult.Status.ADMITTED);
-        verify(script, times(3)).evalSha(
+        verify(script, times(3)).eval(
                 eq(RScript.Mode.READ_WRITE),
                 anyString(),
                 eq(RScript.ReturnType.LIST),

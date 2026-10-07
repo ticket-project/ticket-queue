@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +20,6 @@ import org.redisson.api.RMap;
 import org.redisson.api.RScript;
 import org.redisson.api.RSet;
 import org.redisson.api.RedissonClient;
-import org.redisson.client.RedisException;
 import org.redisson.client.codec.StringCodec;
 import org.springframework.stereotype.Repository;
 
@@ -44,7 +42,6 @@ public class RedisQueueAdvancementStore {
     private static final String FIELD_RR_CURSOR = "rrCursor";
 
     private final RedissonClient redissonClient;
-    private final Map<String, String> scriptShaCache = new ConcurrentHashMap<>();
 
     public Set<Long> findWaitingPerformanceIds() {
         return waitingPerformanceSet().readAll()
@@ -163,23 +160,9 @@ public class RedisQueueAdvancementStore {
             final List<Object> keys,
             final Object... args
     ) {
-        RScript script = redissonClient.getScript(StringCodec.INSTANCE);
-        String scriptSha = scriptShaCache.computeIfAbsent(scriptBody, script::scriptLoad);
-        try {
-            return script.evalSha(RScript.Mode.READ_WRITE, scriptSha, returnType, keys, args);
-        } catch (RedisException exception) {
-            if (!isNoScript(exception)) {
-                throw exception;
-            }
-            String reloadedSha = script.scriptLoad(scriptBody);
-            scriptShaCache.put(scriptBody, reloadedSha);
-            return script.evalSha(RScript.Mode.READ_WRITE, reloadedSha, returnType, keys, args);
-        }
-    }
-
-    private boolean isNoScript(final RedisException exception) {
-        String message = exception.getMessage();
-        return message != null && message.contains("NOSCRIPT");
+        // Redisson useScriptCache(기본 true): EVALSHA 후 NOSCRIPT면 SCRIPT LOAD하고 재시도한다.
+        return redissonClient.getScript(StringCodec.INSTANCE)
+                .eval(RScript.Mode.READ_WRITE, scriptBody, returnType, keys, args);
     }
 
     private ShardQueueState toShardQueueState(final int shardId, final List<Object> result) {
