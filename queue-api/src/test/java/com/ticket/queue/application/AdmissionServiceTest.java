@@ -19,6 +19,8 @@ import com.ticket.queue.domain.JoinResult;
 import com.ticket.queue.domain.PublicState;
 import com.ticket.queue.domain.QueueShardSlot;
 import com.ticket.queue.infra.RedisAdmissionStateStore;
+import com.ticket.queue.infra.SignedAdmissionTokenIssuer;
+import com.ticket.queue.infra.SignedQueueTokenService;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,10 +42,10 @@ class AdmissionServiceTest {
     private RedisAdmissionStateStore admissionStateStore;
 
     @Mock
-    private QueueTokenService queueTokenService;
+    private SignedQueueTokenService queueTokenService;
 
     @Mock
-    private AdmissionTokenIssuer admissionTokenIssuer;
+    private SignedAdmissionTokenIssuer admissionTokenIssuer;
 
     private QueueShardSlot expectedShardSlot;
     private AdmissionService service;

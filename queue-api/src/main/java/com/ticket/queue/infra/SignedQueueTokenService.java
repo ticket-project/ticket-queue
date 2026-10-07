@@ -2,7 +2,6 @@ package com.ticket.queue.infra;
 
 import com.ticket.queue.application.QueueTokenClaims;
 import com.ticket.queue.application.QueueTokenException;
-import com.ticket.queue.application.QueueTokenService;
 import com.ticket.queue.config.QueueProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
@@ -18,7 +17,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.stereotype.Component;
 
 @Component
-public class SignedQueueTokenService implements QueueTokenService {
+public class SignedQueueTokenService {
 
     private static final String VERSION = "q2";
     private static final String DELIMITER = ".";
@@ -38,7 +37,6 @@ public class SignedQueueTokenService implements QueueTokenService {
         this.macThreadLocal = ThreadLocal.withInitial(this::newMac);
     }
 
-    @Override
     public String issue(final QueueTokenClaims claims, final Duration ttl) {
         validateClaims(claims);
         validateTtl(ttl);
@@ -47,7 +45,6 @@ public class SignedQueueTokenService implements QueueTokenService {
         return buildToken(claims, expiresAtMillis);
     }
 
-    @Override
     public QueueTokenClaims verify(final String token) {
         return parseCompact(token);
     }
