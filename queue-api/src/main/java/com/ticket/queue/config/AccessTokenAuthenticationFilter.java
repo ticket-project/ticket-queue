@@ -11,14 +11,16 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.server.ResponseStatusException;
 
+@Component
 public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
 
-    private final AccessTokenVerifier accessTokenVerifier;
+    private final QueueJwtTokenVerifier accessTokenVerifier;
 
-    public AccessTokenAuthenticationFilter(final AccessTokenVerifier accessTokenVerifier) {
+    public AccessTokenAuthenticationFilter(final QueueJwtTokenVerifier accessTokenVerifier) {
         this.accessTokenVerifier = Objects.requireNonNull(accessTokenVerifier, "accessTokenVerifier must not be null");
     }
 

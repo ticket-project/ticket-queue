@@ -14,9 +14,9 @@ import com.ticket.queue.api.dto.JoinResponse;
 import com.ticket.queue.api.dto.PublicStateResponse;
 import com.ticket.queue.application.AdmissionService;
 import com.ticket.queue.config.AccessTokenAuthenticationFilter;
-import com.ticket.queue.config.AccessTokenVerifier;
 import com.ticket.queue.config.AuthenticatedMember;
 import com.ticket.queue.config.AuthenticatedMemberArgumentResolver;
+import com.ticket.queue.config.QueueJwtTokenVerifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -28,13 +28,13 @@ class AdmissionControllerTest {
     private static final String QUEUE_TOKEN_HEADER = "X-Queue-Token";
 
     private AdmissionService admissionService;
-    private AccessTokenVerifier accessTokenVerifier;
+    private QueueJwtTokenVerifier accessTokenVerifier;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         admissionService = mock(AdmissionService.class);
-        accessTokenVerifier = mock(AccessTokenVerifier.class);
+        accessTokenVerifier = mock(QueueJwtTokenVerifier.class);
         mockMvc = MockMvcBuilders.standaloneSetup(new AdmissionController(admissionService))
                 .setCustomArgumentResolvers(new AuthenticatedMemberArgumentResolver())
                 .addFilters(new AccessTokenAuthenticationFilter(accessTokenVerifier))

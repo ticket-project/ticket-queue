@@ -11,9 +11,11 @@ import java.util.Date;
 import java.util.Objects;
 import javax.crypto.SecretKey;
 import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
-public class QueueJwtTokenVerifier implements AccessTokenVerifier {
+@Component
+public class QueueJwtTokenVerifier {
 
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String ROLE_CLAIM = "role";
@@ -29,7 +31,6 @@ public class QueueJwtTokenVerifier implements AccessTokenVerifier {
         this.secretKey = Keys.hmacShaKeyFor(properties.getSecretKey().getBytes(StandardCharsets.UTF_8));
     }
 
-    @Override
     public AuthenticatedMember verify(final String authorizationHeader) {
         try {
             Claims claims = Jwts.parser()
