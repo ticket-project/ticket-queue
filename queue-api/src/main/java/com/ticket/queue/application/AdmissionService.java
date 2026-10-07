@@ -9,12 +9,12 @@ import com.ticket.queue.config.AuthenticatedMember;
 import com.ticket.queue.domain.EnterResult;
 import com.ticket.queue.domain.JoinResult;
 import com.ticket.queue.domain.QueueShardSlot;
-import com.ticket.queue.domain.UuidSupplier;
 import com.ticket.queue.infra.RedisAdmissionStateStore;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -29,7 +29,6 @@ public class AdmissionService {
     private final AdmissionTokenIssuer admissionTokenIssuer;
     private final RedirectProperties redirectProperties;
     private final QueueProperties queueProperties;
-    private final UuidSupplier uuidSupplier;
     private final QueueShardSlotCalculator queueShardSlotCalculator;
 
     public JoinResponse join(final Long performanceId, final AuthenticatedMember member) {
@@ -38,7 +37,7 @@ public class AdmissionService {
         JoinResult join = admissionStateStore.joinQueue(
                 performanceId,
                 userIdHash,
-                uuidSupplier.get().toString(),
+                UUID.randomUUID().toString(),
                 shardSlot,
                 queueProperties.getDefaultQueueTtl()
         );
