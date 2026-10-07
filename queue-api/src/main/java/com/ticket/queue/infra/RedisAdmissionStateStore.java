@@ -33,7 +33,6 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     private static final String JOIN_QUEUE_SCRIPT = load("redis/join_queue.lua");
     private static final String ENTER_QUEUE_SCRIPT = load("redis/enter_queue.lua");
     private static final String ADMIT_QUEUE_SESSION_SCRIPT = load("redis/admit_queue_session.lua");
-    private static final String LEGACY_ENTER_QUEUE_SCRIPT = load("redis/legacy_enter_queue.lua");
     private static final String STATUS_OPEN = "OPEN";
     private static final String STATUS_EMPTY = "EMPTY";
     private static final String FIELD_STATUS = "status";
@@ -124,29 +123,6 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
                 admissionToken,
                 shoppingSessionTtl,
                 SESSION_ADMIT_ENABLED
-        ));
-    }
-
-    @Override
-    public EnterResult enterLegacyQueue(
-            final Long performanceId,
-            final String queueId,
-            final Long seq,
-            final String admissionToken,
-            final Duration shoppingSessionTtl
-    ) {
-        validatePositive(performanceId, "performanceId");
-        validateNotBlank(queueId, "queueId");
-        validatePositive(seq, "seq");
-        validateNotBlank(admissionToken, "admissionToken");
-
-        return toEnterResult(evalScript(
-                LEGACY_ENTER_QUEUE_SCRIPT,
-                RScript.ReturnType.LIST,
-                legacyEnterKeys(performanceId, queueId),
-                seq,
-                admissionToken,
-                ttlDuration(shoppingSessionTtl).toMillis()
         ));
     }
 
@@ -266,17 +242,6 @@ public class RedisAdmissionStateStore implements AdmissionStateStore {
     ) {
         return List.of(
                 RedisKey.performanceEntered(performanceId, queueId)
-        );
-    }
-
-    private List<Object> legacyEnterKeys(
-            final Long performanceId,
-            final String queueId
-    ) {
-        return List.of(
-                RedisKey.publicState(performanceId),
-                RedisKey.performanceEntered(performanceId, queueId),
-                RedisKey.legacyQueue(performanceId, queueId)
         );
     }
 

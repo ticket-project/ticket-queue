@@ -196,33 +196,6 @@ class AdmissionServiceTest {
     }
 
     @Test
-    void enter_uses_legacy_store_path_for_legacy_queue_token() {
-        when(queueTokenService.verify("legacy-token"))
-                .thenReturn(QueueTokenClaims.legacy(1L, "queue-1", 100L, 10L));
-        when(admissionTokenIssuer.issue(10L, 1L, "queue-1", Duration.ofMinutes(15)))
-                .thenReturn("candidate-admission-token");
-        when(admissionStateStore.enterLegacyQueue(
-                1L,
-                "queue-1",
-                100L,
-                "candidate-admission-token",
-                Duration.ofMinutes(15)
-        )).thenReturn(EnterResult.admitted("admission-token", 1_717_000_900_000L));
-
-        EnterResponse response = service.enter(1L, "legacy-token");
-
-        assertThat(response.admissionToken()).isEqualTo("admission-token");
-        verify(admissionStateStore, never()).enterQueue(
-                eq(1L),
-                eq("queue-1"),
-                eq(0),
-                eq(100L),
-                eq("candidate-admission-token"),
-                eq(Duration.ofMinutes(15))
-        );
-    }
-
-    @Test
     void enter_is_idempotent_for_same_queue_id() {
         when(queueTokenService.verify("queue-token"))
                 .thenReturn(new QueueTokenClaims(1L, "queue-1", 17, 100L, 24_691L, 10L));

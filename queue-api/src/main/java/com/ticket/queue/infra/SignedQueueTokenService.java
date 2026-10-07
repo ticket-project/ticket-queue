@@ -4,11 +4,6 @@ import com.ticket.queue.application.QueueTokenClaims;
 import com.ticket.queue.application.QueueTokenException;
 import com.ticket.queue.application.QueueTokenService;
 import com.ticket.queue.config.QueueProperties;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
@@ -16,11 +11,9 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Base64;
-import java.util.Date;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import javax.crypto.Mac;
-import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -31,19 +24,12 @@ public class SignedQueueTokenService implements QueueTokenService {
     private static final String VERSION = "q2";
     private static final String DELIMITER = ".";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
-    private static final String LEGACY_PERFORMANCE_ID_CLAIM = "performanceId";
-    private static final String LEGACY_SEQ_CLAIM = "seq";
-    private static final String LEGACY_MEMBER_ID_CLAIM = "memberId";
-    private static final String LEGACY_SCOPE_CLAIM = "scope";
-    private static final String LEGACY_SCOPE = "queue-entry";
-    private static final String LEGACY_ISSUER = "ticket-queue";
     private static final Base64.Encoder BASE64_URL_ENCODER = Base64.getUrlEncoder().withoutPadding();
     private static final Base64.Decoder BASE64_URL_DECODER = Base64.getUrlDecoder();
     private static final Pattern DELIMITER_PATTERN = Pattern.compile("\\.");
 
     private final Clock clock;
     private final SecretKeySpec secretKeySpec;
-    private final SecretKey legacySecretKey;
     private final ThreadLocal<Mac> macThreadLocal;
 
     @Autowired
@@ -54,9 +40,7 @@ public class SignedQueueTokenService implements QueueTokenService {
     SignedQueueTokenService(final QueueProperties properties, final Clock clock) {
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         String secret = validateSecret(properties);
-        byte[] secretKey = secret.getBytes(StandardCharsets.UTF_8);
-        this.secretKeySpec = new SecretKeySpec(secretKey, HMAC_ALGORITHM);
-        this.legacySecretKey = Keys.hmacShaKeyFor(secretKey);
+        this.secretKeySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM);
         this.macThreadLocal = ThreadLocal.withInitial(this::newMac);
     }
 
@@ -71,10 +55,7 @@ public class SignedQueueTokenService implements QueueTokenService {
 
     @Override
     public QueueTokenClaims verify(final String token) {
-        if (token != null && token.startsWith(VERSION + DELIMITER)) {
-            return parseCompact(token);
-        }
-        return parseLegacy(token);
+        return parseCompact(token);
     }
 
     private String buildToken(final QueueTokenClaims claims, final long expiresAtMillis) {
@@ -139,54 +120,6 @@ public class SignedQueueTokenService implements QueueTokenService {
         } catch (IllegalArgumentException exception) {
             throw new QueueTokenException("queue token invalid", exception);
         }
-    }
-
-    private QueueTokenClaims parseLegacy(final String token) {
-        if (token == null || token.isBlank()) {
-            throw new QueueTokenException("queue token invalid");
-        }
-
-        try {
-            Claims claims = Jwts.parser()
-                    .requireIssuer(LEGACY_ISSUER)
-                    .clock(() -> Date.from(clock.instant()))
-                    .verifyWith(legacySecretKey)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
-            validateLegacyScope(claims);
-            return QueueTokenClaims.legacy(
-                    readLongClaim(claims, LEGACY_PERFORMANCE_ID_CLAIM),
-                    claims.getSubject(),
-                    readLongClaim(claims, LEGACY_SEQ_CLAIM),
-                    readLongClaim(claims, LEGACY_MEMBER_ID_CLAIM)
-            );
-        } catch (ExpiredJwtException exception) {
-            throw new QueueTokenException("queue token expired", exception);
-        } catch (JwtException | IllegalArgumentException exception) {
-            throw new QueueTokenException("queue token invalid", exception);
-        }
-    }
-
-    private void validateLegacyScope(final Claims claims) {
-        if (!LEGACY_SCOPE.equals(claims.get(LEGACY_SCOPE_CLAIM, String.class))) {
-            throw new QueueTokenException("queue token invalid scope");
-        }
-    }
-
-    private Long readLongClaim(final Claims claims, final String claimName) {
-        Object value = claims.get(claimName);
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
-        if (value instanceof String stringValue) {
-            try {
-                return Long.parseLong(stringValue);
-            } catch (NumberFormatException exception) {
-                throw new QueueTokenException("queue token invalid " + claimName, exception);
-            }
-        }
-        throw new QueueTokenException("queue token invalid " + claimName);
     }
 
     private String encodeQueueId(final String queueId) {

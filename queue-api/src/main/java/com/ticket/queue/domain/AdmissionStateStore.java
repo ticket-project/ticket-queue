@@ -23,12 +23,4 @@ public interface AdmissionStateStore {
             Duration shoppingSessionTtl
     );
 
-    EnterResult enterLegacyQueue(
-            Long performanceId,
-            String queueId,
-            Long seq,
-            String admissionToken,
-            Duration shoppingSessionTtl
-    );
-
 }

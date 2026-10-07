@@ -49,8 +49,6 @@
 - **같은 queueToken으로 재시도하면 TTL이 남은 기존 admission token을 돌려준다.** 이 성질을 깨는 변경은
   네트워크 재시도만으로 중복 입장을 만든다.
 - script를 수정하면 **되돌아오는 값의 형태와 개수**가 Java 쪽 파싱과 맞는지 함께 확인한다.
-- `legacy_enter_queue.lua`는 이전 queue token 경로를 위한 호환 경로다. 새 기능의 선례로 삼지 않고,
-  지우려면 이전 토큰의 TTL이 모두 지났는지 확인한다.
 - script를 새로 추가하면 `RedisScriptLoader`가 읽는 경로와 이름 규칙을 따른다.
 
 ## join hot path 규칙
