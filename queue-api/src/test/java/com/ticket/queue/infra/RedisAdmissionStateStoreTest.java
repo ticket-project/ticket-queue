@@ -42,7 +42,7 @@ class RedisAdmissionStateStoreTest {
         assertThat(script).contains("local ticket_value =");
         assertThat(script).contains("redis.call('PEXPIRE', KEYS[1], ttl_millis)");
         assertThat(script).contains("redis.call('SET', KEYS[3], ticket_value, 'PX', ttl_millis)");
-        assertThat(script).contains("local marker_ttl_millis = tonumber(ARGV[6])");
+        assertThat(script).contains("local marker_ttl_millis = tonumber(ARGV[5])");
         assertThat(script).contains("local marker_created = redis.call('SET', KEYS[6], '1', 'NX', 'PX', marker_ttl_millis)");
         assertThat(script).contains("local register_waiting_performance = marker_created and 1 or 0");
         assertThat(script).contains("return {queue_id, local_seq, slot_id, slot_start_millis, 1, register_waiting_performance}");
@@ -124,7 +124,7 @@ class RedisAdmissionStateStoreTest {
                         RedisKey.shardWaitingMarker(1L, 17)
                 );
         assertThat(argsCaptor.getValue())
-                .containsExactly("queue-1", "user-hash", 86_400_000L, 24_691L, 1_234_550L, 10_000L);
+                .containsExactly("queue-1", 86_400_000L, 24_691L, 1_234_550L, 10_000L);
         verify(waitingPerformanceSet).add("1");
     }
 

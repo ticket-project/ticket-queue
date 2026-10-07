@@ -60,7 +60,6 @@ public class RedisAdmissionStateStore {
                 RScript.ReturnType.LIST,
                 joinKeys(performanceId, userIdHash, candidateQueueId, shardSlot.shardId()),
                 candidateQueueId,
-                userIdHash,
                 Math.max(1L, queueTtl.toMillis()),
                 shardSlot.slotId(),
                 shardSlot.slotStartMillis(),

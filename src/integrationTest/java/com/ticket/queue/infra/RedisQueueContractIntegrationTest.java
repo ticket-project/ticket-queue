@@ -154,6 +154,17 @@ class RedisQueueContractIntegrationTest {
         assertThat(result.status()).isEqualTo(EnterResult.Status.EXPIRED);
     }
 
+    @Test
+    void enter_still_reads_ticket_written_in_previous_six_field_format() {
+        redissonClient.getBucket(RedisKey.shardQueue(5L, 0, "old-queue"), StringCodec.INSTANCE)
+                .set("old-queue|1|100|5000|user-hash|1717000000000", QUEUE_TTL);
+        redissonClient.getMap(RedisKey.shardState(5L, 0), StringCodec.INSTANCE).put("servingSeq", "1");
+
+        EnterResult result = admissionStore.enterQueue(5L, "old-queue", 0, 1L, "admission-a", SESSION_TTL);
+
+        assertThat(result.status()).isEqualTo(EnterResult.Status.ADMITTED);
+    }
+
     private QueueShardSlot closedSlot(final int shardId) {
         long slotStartMillis = System.currentTimeMillis() - 1_000L;
         long slotId = Math.floorDiv(slotStartMillis, SLOT_SIZE_MILLIS);
