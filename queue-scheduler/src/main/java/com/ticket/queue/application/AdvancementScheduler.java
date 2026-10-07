@@ -1,7 +1,7 @@
 package com.ticket.queue.application;
 
 import com.ticket.queue.config.AdvancementProperties;
-import com.ticket.queue.domain.QueueAdvancementStore;
+import com.ticket.queue.infra.RedisQueueAdvancementStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AdvancementScheduler {
 
-    private final QueueAdvancementStore queueAdvancementStore;
+    private final RedisQueueAdvancementStore queueAdvancementStore;
     private final AdvancementProperties properties;
 
     @Scheduled(fixedDelayString = "${app.queue.advance-interval-ms:1000}")

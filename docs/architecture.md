@@ -32,7 +32,7 @@ queue-api ──> queue-redis <── queue-scheduler
 | `com.ticket.queue.api` | HTTP endpoint와 응답 DTO |
 | `com.ticket.queue.application` | use case, public state 조회, scheduler 전진 계산, admission 응답 조립 |
 | `com.ticket.queue.config` | `app.queue` 설정, admission·queue token 설정, 인증 filter, argument resolver |
-| `com.ticket.queue.domain` | queue model과 port(`AdmissionStateStore`, `QueueAdvancementStore`) |
+| `com.ticket.queue.domain` | queue model record(`JoinResult`, `EnterResult`, `PublicState`, `QueueShardSlot`). 구현이 하나뿐인 port interface는 두지 않고 `infra`의 Redis 저장소를 직접 주입한다 |
 | `com.ticket.queue.infra` | Redis Lua·Redisson 저장소, advance lock, signed token 발급 구현 |
 
 `queue-redis`의 `infra`에는 `RedisKey`, `RedisValues`, `RedisScriptLoader`처럼

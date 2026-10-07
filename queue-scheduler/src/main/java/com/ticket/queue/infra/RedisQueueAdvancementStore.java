@@ -4,7 +4,6 @@ import static com.ticket.queue.infra.RedisScriptLoader.load;
 import static com.ticket.queue.infra.RedisValues.asLong;
 import static com.ticket.queue.infra.RedisValues.parseLong;
 
-import com.ticket.queue.domain.QueueAdvancementStore;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -28,7 +27,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 @RequiredArgsConstructor
-public class RedisQueueAdvancementStore implements QueueAdvancementStore {
+public class RedisQueueAdvancementStore {
 
     private static final long ADVANCE_LOCK_LEASE_MILLIS = 5_000L;
     private static final String ADVANCE_QUEUE_STATE_SCRIPT = load("redis/advance_queue_state.lua");
@@ -47,7 +46,6 @@ public class RedisQueueAdvancementStore implements QueueAdvancementStore {
     private final RedissonClient redissonClient;
     private final Map<String, String> scriptShaCache = new ConcurrentHashMap<>();
 
-    @Override
     public Set<Long> findWaitingPerformanceIds() {
         return waitingPerformanceSet().readAll()
                 .stream()
@@ -55,7 +53,6 @@ public class RedisQueueAdvancementStore implements QueueAdvancementStore {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
-    @Override
     public void advancePublicState(
             final Long performanceId,
             final int advanceBatchSize,
