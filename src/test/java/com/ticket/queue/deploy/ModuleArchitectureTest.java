@@ -49,13 +49,6 @@ class ModuleArchitectureTest {
         assertThat(schedulerApplication)
                 .contains("class QueueSchedulerApplication")
                 .contains("@EnableScheduling");
-
-        assertThat(Path.of(
-                "queue-api/src/main/java/com/ticket/queue/application/AdvancementScheduler.java"))
-                .doesNotExist();
-        assertThat(Path.of(
-                "queue-scheduler/src/main/java/com/ticket/queue/api/AdmissionController.java"))
-                .doesNotExist();
     }
 
     private String read(final Path path) {

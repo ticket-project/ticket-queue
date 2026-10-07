@@ -65,12 +65,10 @@ queue-api ──> queue-redis <── queue-scheduler
   서로를 의존하는 문구가 `build.gradle`에 들어가면 실패한다.
 - `queue-redis`는 `java-library`이며 Spring Boot 플러그인을 갖지 않는다.
 - `@EnableScheduling`은 `QueueSchedulerApplication`에만 있다. `QueueApiApplication`에 넣으면 실패한다.
-- `queue-api`에 `AdvancementScheduler`를, `queue-scheduler`에 `AdmissionController`를 두면 실패한다.
 
 ### 그 밖의 배포 검증 테스트
 
-`NginxDeployConfigTest`, `QueueCdnCacheArchitectureTest`가 `deploy/` 설정의
-불변식을 고정한다. 해당 파일을 바꿀 때는 이 테스트가 무엇을 전제하는지 먼저 읽고,
+`NginxDeployConfigTest`가 `deploy/` 설정의 불변식을 고정한다. 해당 파일을 바꿀 때는 이 테스트가 무엇을 전제하는지 먼저 읽고,
 전제 자체를 바꿀 생각이면 테스트를 함께 고친다. 테스트만 지워서 통과시키지 않는다.
 
 ## Redis key 소유권
