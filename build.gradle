@@ -72,10 +72,6 @@ dependencies {
     integrationTestImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.compilerArgs += '-parameters'
-}
-
 tasks.named('compileIntegrationTestJava') {
     dependsOn ':queue-api:classes', ':queue-scheduler:classes'
 }

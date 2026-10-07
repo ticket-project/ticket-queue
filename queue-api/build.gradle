@@ -21,10 +21,6 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.compilerArgs += '-parameters'
-}
-
 tasks.named('jar') {
     enabled = false
 }
