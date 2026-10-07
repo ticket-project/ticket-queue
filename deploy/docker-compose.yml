@@ -37,10 +37,6 @@ services:
     environment:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
-      QUEUE_DEFAULT_QUEUE_TTL: ${QUEUE_DEFAULT_QUEUE_TTL:-24h}
-      QUEUE_DEFAULT_REFRESH_AFTER_MS: ${QUEUE_DEFAULT_REFRESH_AFTER_MS:-5000}
-      QUEUE_SHARD_COUNT: ${QUEUE_SHARD_COUNT:-128}
-      QUEUE_SLOT_SIZE_MILLIS: ${QUEUE_SLOT_SIZE_MILLIS:-50}
       JAVA_TOOL_OPTIONS: -javaagent:/opt/datadog/dd-java-agent.jar
       DD_AGENT_HOST: datadog-agent
       DD_SERVICE: ticket-queue-api

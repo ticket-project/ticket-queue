@@ -56,7 +56,7 @@ deploy/datadog/conf.d/redisdb.d/conf.yaml -> /home/ubuntu/ticket-queue/datadog/c
 
 `deploy/env.example`을 기준으로 `.env`를 만듭니다.
 
-API 전용 secret은 `JWT_SECRET`, `QUEUE_TOKEN_SECRET`, `ADMISSION_TOKEN_SECRET_KEY`입니다. Compose의 `queue` 서비스만 `.env` 전체를 읽고, `scheduler` 서비스에는 이 값들을 전달하지 않습니다. 대신 TTL, refresh, shard/slot처럼 Redis queue 형상을 결정하는 비밀이 아닌 기술 설정은 두 서비스에 동일하게 전달합니다. 이 경계를 유지하는 이유는 두 프로세스의 대기열 계산은 일치시키면서도 스케줄러 침해 시 API 서명 키까지 노출되는 것을 막기 위해서입니다.
+API 전용 secret은 `JWT_SECRET`, `QUEUE_TOKEN_SECRET`, `ADMISSION_TOKEN_SECRET_KEY`입니다. Compose의 `queue` 서비스만 `.env` 전체를 읽고, `scheduler` 서비스에는 이 값들을 전달하지 않습니다. 대신 TTL, refresh, shard/slot처럼 Redis queue 형상을 결정하는 비밀이 아닌 기술 설정은 두 서비스에 동일하게 전달합니다(`queue`는 `env_file`의 `.env`로, `scheduler`는 Compose `environment`의 `${VAR:-기본값}` 치환으로). 이 경계를 유지하는 이유는 두 프로세스의 대기열 계산은 일치시키면서도 스케줄러 침해 시 API 서명 키까지 노출되는 것을 막기 위해서입니다.
 
 API와 scheduler가 공유하는 주요 정책 환경변수:
 
