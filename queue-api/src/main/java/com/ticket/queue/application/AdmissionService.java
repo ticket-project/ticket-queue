@@ -8,7 +8,6 @@ import com.ticket.queue.config.RedirectProperties;
 import com.ticket.queue.config.AuthenticatedMember;
 import com.ticket.queue.domain.EnterResult;
 import com.ticket.queue.domain.JoinResult;
-import com.ticket.queue.domain.PublicState;
 import com.ticket.queue.domain.QueueShardSlot;
 import com.ticket.queue.domain.UuidSupplier;
 import com.ticket.queue.infra.RedisAdmissionStateStore;
@@ -34,22 +33,54 @@ public class AdmissionService {
     private final QueueShardSlotCalculator queueShardSlotCalculator;
 
     public JoinResponse join(final Long performanceId, final AuthenticatedMember member) {
-        JoinResult join = joinState(performanceId, member);
-        String queueToken = issueQueueToken(performanceId, join, member);
+        String userIdHash = userIdHash(member);
+        QueueShardSlot shardSlot = queueShardSlotCalculator.calculate(performanceId, member.memberId());
+        JoinResult join = admissionStateStore.joinQueue(
+                performanceId,
+                userIdHash,
+                uuidSupplier.get().toString(),
+                shardSlot,
+                queueProperties.getDefaultQueueTtl()
+        );
+        String queueToken = queueTokenService.issue(
+                new QueueTokenClaims(
+                        performanceId,
+                        join.queueId(),
+                        join.shardId(),
+                        join.localSeq(),
+                        join.slotId(),
+                        member.memberId()
+                ),
+                queueProperties.getDefaultQueueTtl()
+        );
 
         return JoinResponse.waiting(performanceId, join, queueToken, queueProperties.getJoinPollAfterMs());
     }
 
     public PublicStateResponse state(final Long performanceId) {
-        return PublicStateResponse.from(readPublicState(performanceId));
+        return PublicStateResponse.from(
+                admissionStateStore.readPublicState(performanceId, queueProperties.getDefaultRefreshAfterMs())
+        );
     }
 
     public EnterResponse enter(final Long performanceId, final String queueToken) {
         QueueTokenClaims claims = verifyQueueToken(queueToken);
         verifyPerformance(performanceId, claims);
 
-        String admissionToken = issueAdmissionToken(performanceId, claims);
-        EnterResult result = enterState(performanceId, claims, admissionToken);
+        String admissionToken = admissionTokenIssuer.issue(
+                claims.memberId(),
+                performanceId,
+                claims.queueId(),
+                queueProperties.getShoppingSessionTtl()
+        );
+        EnterResult result = admissionStateStore.enterQueue(
+                performanceId,
+                claims.queueId(),
+                claims.shardId(),
+                claims.localSeq(),
+                admissionToken,
+                queueProperties.getShoppingSessionTtl()
+        );
 
         return switch (result.status()) {
             case ADMITTED -> EnterResponse.active(
@@ -62,46 +93,6 @@ public class AdmissionService {
         };
     }
 
-    private JoinResult joinState(
-            final Long performanceId,
-            final AuthenticatedMember member
-    ) {
-        String userIdHash = userIdHash(member);
-        QueueShardSlot shardSlot = queueShardSlotCalculator.calculate(performanceId, member.memberId());
-        return admissionStateStore.joinQueue(
-                performanceId,
-                userIdHash,
-                uuidSupplier.get().toString(),
-                shardSlot,
-                queueProperties.getDefaultQueueTtl()
-        );
-    }
-
-    private String issueQueueToken(
-            final Long performanceId,
-            final JoinResult join,
-            final AuthenticatedMember member
-    ) {
-        return queueTokenService.issue(
-                new QueueTokenClaims(
-                        performanceId,
-                        join.queueId(),
-                        join.shardId(),
-                        join.localSeq(),
-                        join.slotId(),
-                        member.memberId()
-                ),
-                queueProperties.getDefaultQueueTtl()
-        );
-    }
-
-    private PublicState readPublicState(final Long performanceId) {
-        return admissionStateStore.readPublicState(
-                performanceId,
-                queueProperties.getDefaultRefreshAfterMs()
-        );
-    }
-
     private void verifyPerformance(
             final Long performanceId,
             final QueueTokenClaims claims
@@ -109,33 +100,6 @@ public class AdmissionService {
         if (!performanceId.equals(claims.performanceId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "queue token performance mismatch");
         }
-    }
-
-    private String issueAdmissionToken(
-            final Long performanceId,
-            final QueueTokenClaims claims
-    ) {
-        return admissionTokenIssuer.issue(
-                claims.memberId(),
-                performanceId,
-                claims.queueId(),
-                queueProperties.getShoppingSessionTtl()
-        );
-    }
-
-    private EnterResult enterState(
-            final Long performanceId,
-            final QueueTokenClaims claims,
-            final String admissionToken
-    ) {
-        return admissionStateStore.enterQueue(
-                performanceId,
-                claims.queueId(),
-                claims.shardId(),
-                claims.localSeq(),
-                admissionToken,
-                queueProperties.getShoppingSessionTtl()
-        );
     }
 
     private QueueTokenClaims verifyQueueToken(final String queueToken) {
