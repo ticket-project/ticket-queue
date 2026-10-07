@@ -6,10 +6,10 @@ import com.ticket.queue.api.dto.PublicStateResponse;
 import com.ticket.queue.config.QueueProperties;
 import com.ticket.queue.config.RedirectProperties;
 import com.ticket.queue.config.AuthenticatedMember;
+import com.ticket.queue.domain.AdmissionStateStore;
 import com.ticket.queue.domain.EnterResult;
 import com.ticket.queue.domain.JoinResult;
 import com.ticket.queue.domain.QueueShardSlot;
-import com.ticket.queue.infra.RedisAdmissionStateStore;
 import com.ticket.queue.infra.SignedAdmissionTokenIssuer;
 import com.ticket.queue.infra.SignedQueueTokenService;
 import java.nio.charset.StandardCharsets;
@@ -26,7 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class AdmissionService {
 
-    private final RedisAdmissionStateStore admissionStateStore;
+    private final AdmissionStateStore admissionStateStore;
     private final SignedQueueTokenService queueTokenService;
     private final SignedAdmissionTokenIssuer admissionTokenIssuer;
     private final RedirectProperties redirectProperties;

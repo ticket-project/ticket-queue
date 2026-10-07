@@ -5,7 +5,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ticket.queue.config.AdvancementProperties;
-import com.ticket.queue.infra.RedisQueueAdvancementStore;
+import com.ticket.queue.domain.QueueAdvancementStore;
 import java.time.Duration;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,7 @@ class AdvancementSchedulerTest {
         properties.setShardCount(128);
         properties.setSlotSizeMillis(50L);
         properties.setSlotCloseGraceMillis(200L);
-        RedisQueueAdvancementStore queueAdvancementStore = mock(RedisQueueAdvancementStore.class);
+        QueueAdvancementStore queueAdvancementStore = mock(QueueAdvancementStore.class);
         AdvancementScheduler scheduler = new AdvancementScheduler(queueAdvancementStore, properties);
         when(queueAdvancementStore.findWaitingPerformanceIds()).thenReturn(Set.of(1L, 2L));
 

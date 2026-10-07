@@ -5,6 +5,7 @@ import static com.ticket.queue.infra.RedisValues.asLong;
 import static com.ticket.queue.infra.RedisValues.asString;
 import static com.ticket.queue.infra.RedisValues.parseLong;
 
+import com.ticket.queue.domain.AdmissionStateStore;
 import com.ticket.queue.domain.EnterResult;
 import com.ticket.queue.domain.JoinResult;
 import com.ticket.queue.domain.PublicState;
@@ -23,7 +24,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 @RequiredArgsConstructor
-public class RedisAdmissionStateStore {
+public class RedisAdmissionStateStore implements AdmissionStateStore {
 
     private static final long WAITING_MARKER_TTL_MILLIS = 10_000L;
     private static final String JOIN_QUEUE_SCRIPT = load("redis/join_queue.lua");
@@ -43,6 +44,7 @@ public class RedisAdmissionStateStore {
 
     private final RedissonClient redissonClient;
 
+    @Override
     public JoinResult joinQueue(
             final Long performanceId,
             final String userIdHash,
@@ -79,6 +81,7 @@ public class RedisAdmissionStateStore {
         );
     }
 
+    @Override
     public PublicState readPublicState(final Long performanceId, final long refreshAfterMs) {
         validatePositive(performanceId, "performanceId");
         if (refreshAfterMs <= 0) {
@@ -88,6 +91,7 @@ public class RedisAdmissionStateStore {
         return toPublicState(performanceId, publicStateMap(performanceId).readAllMap(), refreshAfterMs);
     }
 
+    @Override
     public EnterResult enterQueue(
             final Long performanceId,
             final String queueId,

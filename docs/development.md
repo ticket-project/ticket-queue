@@ -33,7 +33,7 @@
 
 1. **계약 확정** — endpoint, 헤더, 요청·응답 필드, 상태 코드, 오류를 먼저 정한다.
    기존 호환 필드(`seq`, `admittedUntilSeq`, `tailSeq`)를 지우려면 클라이언트와 부하 테스트 영향을 먼저 확인한다.
-2. **저장소 계약** — `infra`의 `RedisAdmissionStateStore` 또는 `RedisQueueAdvancementStore` 메서드 계약을 먼저 정한다.
+2. **port 정의** — `domain`의 `AdmissionStateStore` 또는 `QueueAdvancementStore` 계약을 먼저 넓힌다.
 3. **Lua와 Redis 구현** — 원자적으로 처리해야 하는 단계를 script 하나로 묶는다.
    여러 명령을 Java에서 순서대로 부르는 형태로 나누지 않는다.
 4. **application** — use case와 계산을 구현한다. 시각은 주입된 `Clock`을 쓰고 `System.currentTimeMillis()`를
