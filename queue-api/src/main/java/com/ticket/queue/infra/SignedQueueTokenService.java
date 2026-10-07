@@ -15,7 +15,6 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -32,12 +31,7 @@ public class SignedQueueTokenService implements QueueTokenService {
     private final SecretKeySpec secretKeySpec;
     private final ThreadLocal<Mac> macThreadLocal;
 
-    @Autowired
-    public SignedQueueTokenService(final QueueProperties properties) {
-        this(properties, Clock.systemUTC());
-    }
-
-    SignedQueueTokenService(final QueueProperties properties, final Clock clock) {
+    public SignedQueueTokenService(final QueueProperties properties, final Clock clock) {
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         String secret = validateSecret(properties);
         this.secretKeySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM);

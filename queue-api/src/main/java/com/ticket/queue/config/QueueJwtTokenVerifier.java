@@ -22,11 +22,7 @@ public class QueueJwtTokenVerifier implements AccessTokenVerifier {
     private final Clock clock;
     private final SecretKey secretKey;
 
-    public QueueJwtTokenVerifier(final QueueJwtProperties properties) {
-        this(properties, Clock.systemUTC());
-    }
-
-    QueueJwtTokenVerifier(final QueueJwtProperties properties, final Clock clock) {
+    public QueueJwtTokenVerifier(final QueueJwtProperties properties, final Clock clock) {
         this.properties = Objects.requireNonNull(properties, "properties must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.properties.validate();

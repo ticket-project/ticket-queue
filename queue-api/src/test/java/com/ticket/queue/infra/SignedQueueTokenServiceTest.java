@@ -18,7 +18,7 @@ class SignedQueueTokenServiceTest {
 
     @Test
     void issue_and_verify_preserves_member_binding() {
-        SignedQueueTokenService service = new SignedQueueTokenService(queueProperties());
+        SignedQueueTokenService service = new SignedQueueTokenService(queueProperties(), Clock.systemUTC());
 
         String token = service.issue(
                 new QueueTokenClaims(1L, "queue-1", 17, 42L, 24_691L, 10L),
@@ -40,7 +40,7 @@ class SignedQueueTokenServiceTest {
 
     @Test
     void verify_rejects_tampered_token() {
-        SignedQueueTokenService service = new SignedQueueTokenService(queueProperties());
+        SignedQueueTokenService service = new SignedQueueTokenService(queueProperties(), Clock.systemUTC());
         String token = service.issue(
                 new QueueTokenClaims(1L, "queue-1", 17, 42L, 24_691L, 10L),
                 Duration.ofHours(1)
