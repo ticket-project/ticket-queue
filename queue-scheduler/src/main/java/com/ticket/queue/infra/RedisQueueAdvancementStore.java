@@ -66,14 +66,7 @@ public class RedisQueueAdvancementStore implements QueueAdvancementStore {
             final long refreshAfterMs
     ) {
         validatePositive(performanceId, "performanceId");
-        if (advanceBatchSize <= 0
-                || shardCount <= 0
-                || slotSizeMillis <= 0
-                || slotCloseGraceMillis < 0
-                || stateTtl == null
-                || stateTtl.isZero()
-                || stateTtl.isNegative()
-                || refreshAfterMs <= 0) {
+        if (stateTtl.isZero() || stateTtl.isNegative()) {
             return;
         }
 
