@@ -1,6 +1,5 @@
 package com.ticket.queue.infra;
 
-import com.ticket.queue.application.AdmissionTokenIssuer;
 import com.ticket.queue.config.AdmissionTokenProperties;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -15,7 +14,7 @@ import javax.crypto.SecretKey;
 import org.springframework.stereotype.Component;
 
 @Component
-public class SignedAdmissionTokenIssuer implements AdmissionTokenIssuer {
+public class SignedAdmissionTokenIssuer {
 
     private static final String PERFORMANCE_ID_CLAIM = "performanceId";
     private static final String QUEUE_ID_CLAIM = "queueId";
@@ -33,7 +32,6 @@ public class SignedAdmissionTokenIssuer implements AdmissionTokenIssuer {
         this.secretKey = Keys.hmacShaKeyFor(properties.getSecretKey().getBytes(StandardCharsets.UTF_8));
     }
 
-    @Override
     public String issue(final Long memberId, final Long performanceId, final String queueId, final Duration ttl) {
         validatePositive(memberId, "memberId");
         validatePositive(performanceId, "performanceId");

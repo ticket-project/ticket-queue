@@ -43,7 +43,7 @@ queue-api ──> queue-redis <── queue-scheduler
 | 책임 | 위치 |
 | --- | --- |
 | `/join`, `/state`, `/enter` endpoint와 응답 DTO | `queue-api` 의 `api` |
-| queue token 발급·검증, admission token 발급 | `queue-api` 의 `application` + `infra` |
+| queue token 발급·검증, admission token 발급 | `queue-api` 의 `infra`(`SignedQueueTokenService`, `SignedAdmissionTokenIssuer`). 구현이 하나라 `application`에 interface를 두지 않고 직접 주입한다 |
 | access token 검증과 회원 식별 | `queue-api` 의 `config` |
 | shard와 slot 계산 | `queue-api` 의 `application` |
 | serving sequence 전진과 public state 갱신 | `queue-scheduler` |

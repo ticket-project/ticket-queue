@@ -10,6 +10,8 @@ import com.ticket.queue.domain.EnterResult;
 import com.ticket.queue.domain.JoinResult;
 import com.ticket.queue.domain.QueueShardSlot;
 import com.ticket.queue.infra.RedisAdmissionStateStore;
+import com.ticket.queue.infra.SignedAdmissionTokenIssuer;
+import com.ticket.queue.infra.SignedQueueTokenService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -25,8 +27,8 @@ import org.springframework.web.server.ResponseStatusException;
 public class AdmissionService {
 
     private final RedisAdmissionStateStore admissionStateStore;
-    private final QueueTokenService queueTokenService;
-    private final AdmissionTokenIssuer admissionTokenIssuer;
+    private final SignedQueueTokenService queueTokenService;
+    private final SignedAdmissionTokenIssuer admissionTokenIssuer;
     private final RedirectProperties redirectProperties;
     private final QueueProperties queueProperties;
     private final QueueShardSlotCalculator queueShardSlotCalculator;
