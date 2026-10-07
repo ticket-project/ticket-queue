@@ -14,10 +14,6 @@ dependencies {
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.compilerArgs += '-parameters'
-}
-
 tasks.named('jar') {
     enabled = false
 }
