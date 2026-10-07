@@ -4,7 +4,6 @@ import com.ticket.queue.api.dto.EnterResponse;
 import com.ticket.queue.api.dto.JoinResponse;
 import com.ticket.queue.api.dto.PublicStateResponse;
 import com.ticket.queue.config.QueueProperties;
-import com.ticket.queue.config.RedirectProperties;
 import com.ticket.queue.config.AuthenticatedMember;
 import com.ticket.queue.domain.EnterResult;
 import com.ticket.queue.domain.JoinResult;
@@ -26,10 +25,11 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class AdmissionService {
 
+    private static final String TICKETING_URL_PREFIX = "/booking/seat?performanceId=";
+
     private final RedisAdmissionStateStore admissionStateStore;
     private final SignedQueueTokenService queueTokenService;
     private final SignedAdmissionTokenIssuer admissionTokenIssuer;
-    private final RedirectProperties redirectProperties;
     private final QueueProperties queueProperties;
     private final QueueShardSlotCalculator queueShardSlotCalculator;
 
@@ -87,7 +87,7 @@ public class AdmissionService {
             case ADMITTED -> EnterResponse.active(
                     result.admissionToken(),
                     result.expiresAtMillis(),
-                    redirectProperties.resolve(performanceId)
+                    TICKETING_URL_PREFIX + performanceId
             );
             case NOT_ADMITTED -> throw new ResponseStatusException(HttpStatus.FORBIDDEN, "queue sequence not admitted");
             case EXPIRED -> throw new ResponseStatusException(HttpStatus.GONE, "queue entry expired");
