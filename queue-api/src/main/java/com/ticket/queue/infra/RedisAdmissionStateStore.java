@@ -13,7 +13,6 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.redisson.api.RMap;
 import org.redisson.api.RScript;
@@ -30,17 +29,13 @@ public class RedisAdmissionStateStore {
     private static final String JOIN_QUEUE_SCRIPT = load("redis/join_queue.lua");
     private static final String ENTER_QUEUE_SCRIPT = load("redis/enter_queue.lua");
     private static final String ADMIT_QUEUE_SESSION_SCRIPT = load("redis/admit_queue_session.lua");
-    private static final String STATUS_OPEN = "OPEN";
     private static final String STATUS_EMPTY = "EMPTY";
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_SHARD_COUNT = "shardCount";
     private static final String FIELD_SLOT_SIZE_MILLIS = "slotSizeMillis";
     private static final String FIELD_SERVING = "serving";
     private static final String FIELD_TAIL = "tail";
-    private static final String FIELD_ADMITTED_UNTIL_SEQ = "admittedUntilSeq";
-    private static final String FIELD_TAIL_SEQ = "tailSeq";
     private static final String FIELD_REFRESH_AFTER_MS = "refreshAfterMs";
-    private static final String FIELD_RR_CURSOR = "rrCursor";
     private static final long ENTER_ADMITTED = 1L;
     private static final long ENTER_EXPIRED = 3L;
     private static final long SESSION_ADMIT_DISABLED = 0L;
@@ -160,12 +155,12 @@ public class RedisAdmissionStateStore {
         Map<Integer, Long> serving = parseShardMap(values.get(FIELD_SERVING));
         Map<Integer, Long> tail = parseShardMap(values.get(FIELD_TAIL));
         long refreshAfterMs = parseLong(values.get(FIELD_REFRESH_AFTER_MS), defaultRefreshAfterMs);
-        int shardCount = Math.toIntExact(parseLong(values.get(FIELD_SHARD_COUNT), Math.max(serving.size(), tail.size())));
+        int shardCount = Math.toIntExact(parseLong(values.get(FIELD_SHARD_COUNT), 0L));
         long slotSizeMillis = parseLong(values.get(FIELD_SLOT_SIZE_MILLIS), 0L);
 
         return new PublicState(
                 performanceId,
-                publicStatus(values, serving, tail),
+                values.getOrDefault(FIELD_STATUS, STATUS_EMPTY),
                 shardCount,
                 slotSizeMillis,
                 serving,
@@ -173,14 +168,6 @@ public class RedisAdmissionStateStore {
                 refreshAfterMs,
                 System.currentTimeMillis()
         );
-    }
-
-    private String publicStatus(
-            final Map<String, String> values,
-            final Map<Integer, Long> serving,
-            final Map<Integer, Long> tail
-    ) {
-        return values.getOrDefault(FIELD_STATUS, hasPending(serving, tail) ? STATUS_OPEN : STATUS_EMPTY);
     }
 
     private List<Object> runEnterReadinessScript(
@@ -245,11 +232,6 @@ public class RedisAdmissionStateStore {
         // Redisson useScriptCache(기본 true): EVALSHA 후 NOSCRIPT면 SCRIPT LOAD하고 재시도한다.
         return redissonClient.getScript(StringCodec.INSTANCE)
                 .eval(RScript.Mode.READ_WRITE, scriptBody, returnType, keys, args);
-    }
-
-    private boolean hasPending(final Map<Integer, Long> serving, final Map<Integer, Long> tail) {
-        return tail.entrySet().stream()
-                .anyMatch(entry -> entry.getValue() > serving.getOrDefault(entry.getKey(), 0L));
     }
 
     private Map<Integer, Long> parseShardMap(final String encoded) {
