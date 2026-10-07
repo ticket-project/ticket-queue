@@ -13,6 +13,7 @@ import com.ticket.queue.api.dto.JoinResponse;
 import com.ticket.queue.api.dto.PublicStateResponse;
 import com.ticket.queue.config.AuthenticatedMember;
 import com.ticket.queue.config.QueueProperties;
+import com.ticket.queue.config.RedirectProperties;
 import com.ticket.queue.domain.EnterResult;
 import com.ticket.queue.domain.JoinResult;
 import com.ticket.queue.domain.PublicState;
@@ -58,6 +59,7 @@ class AdmissionServiceTest {
         queueProperties.setShardCount(128);
         queueProperties.setSlotSizeMillis(50L);
         queueProperties.setJoinPollAfterMs(1_000L);
+        RedirectProperties redirectProperties = new RedirectProperties();
         QueueShardSlotCalculator shardSlotCalculator = new QueueShardSlotCalculator(
                 queueProperties,
                 Clock.fixed(Instant.ofEpochMilli(1_234_567L), ZoneOffset.UTC)
@@ -67,6 +69,7 @@ class AdmissionServiceTest {
                 admissionStateStore,
                 queueTokenService,
                 admissionTokenIssuer,
+                redirectProperties,
                 queueProperties,
                 shardSlotCalculator
         );
