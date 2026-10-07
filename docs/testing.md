@@ -47,7 +47,7 @@ root project의 `src/test/java/com/ticket/queue/deploy`에 있는 테스트는 �
 | 테스트 | 고정하는 것 |
 | --- | --- |
 | `ModuleArchitectureTest` | 세 모듈의 의존 관계, Spring Boot 플러그인 위치, `@EnableScheduling`의 소유자 |
-| `NginxDeployConfigTest` | 배포 nginx 설정의 라우팅 형태 |
+| `NginxDeployConfigTest` | 설정 원문 복사가 아닌 깨지면 안 되는 불변식만: nginx `/api` 응답 `no-store`·`s-maxage` 없음, scheduler에 API secret 없음, 배포 Redis `6379` 미공개 |
 | `QueueCdnCacheArchitectureTest` | `/state`만 캐시하는 경계 |
 | `ClaudeWorkflowConfigTest` | `claude.yml`과 `claude-code-review.yml`의 트리거와 조건 |
 
