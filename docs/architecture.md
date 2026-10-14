@@ -1,8 +1,7 @@
 # 아키텍처 기준
 
-이 문서는 모듈 경계, 코드 위치, 의존 방향, Redis key 소유권을 정리한다. 전체 흐름과 API 계약,
-Redis key 목록, 설정값 기본값은 [README.md](../README.md)가 원본이다. 구현 절차는
-[development.md](development.md), 검증은 [testing.md](testing.md)를 함께 본다.
+이 문서는 모듈 경계, 코드 위치, 의존 방향, Redis key 목록과 소유권을 정리한다. 요청 흐름과 API 계약은
+[api.md](api.md), 구현 절차와 설정 목록은 [development.md](development.md), 검증은 [testing.md](testing.md)를 함께 본다.
 
 ## 모듈 경계
 
@@ -73,7 +72,23 @@ queue-api ──> queue-redis <── queue-scheduler
 
 ## Redis key 소유권
 
-key 형식의 정본은 [README.md의 Redis Key](../README.md#redis-key)다. 경계 판단에서 중요한 것은 두 가지다.
+이 목록이 key 형식의 정본이다. TTL 이름은 [development.md의 TTL 표](development.md#ttl-두-종류를-섞지-않는다)를 본다.
+
+```text
+q:{performanceId:shardId}:seq                   # shard-local localSeq counter; defaultQueueTtl
+q:{performanceId:shardId}:state                 # scheduler가 갱신하는 shard serving/tail state; defaultQueueTtl
+q:{performanceId:shardId}:user:{userIdHash}     # 사용자별 중복 join 방지 compact value; defaultQueueTtl
+q:{performanceId:shardId}:queue:{queueId}       # queue ticket compact value; defaultQueueTtl
+q:{performanceId:shardId}:slot-tail             # slot별 local tail hash; defaultQueueTtl
+q:{performanceId:shardId}:pending-slots         # 아직 처리되지 않은 slot ZSET; defaultQueueTtl
+q:{performanceId:shardId}:waiting-marker        # waiting set 재등록을 줄이는 shard marker; 10초
+q:{performanceId}:state                         # public state projection hash; defaultQueueTtl
+q:{performanceId}:entered:{queueId}             # enter 멱등 marker hash; shoppingSessionTtl
+queue:waiting:performances                       # scheduler scan 대상 performanceId set; TTL 없이 비면 제거
+```
+
+scheduler는 각 shard의 `q:{performanceId:shardId}:seq`를 읽어 tail을 계산한다. 그래서 `/join`은 state hash를 매번
+갱신하지 않아도 되고, public projection은 scheduler 주기에서만 만들어진다. 경계 판단에서 중요한 것은 두 가지다.
 
 - **hash tag가 원자 연산의 단위다.** shard 단위 hot path는 `{performanceId:shardId}`를 쓰고,
   public state projection과 입장 멱등 marker는 회차 단위 `{performanceId}`를 쓴다.
