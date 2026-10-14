@@ -1,8 +1,9 @@
 # Ticket Queue 개발 기준
 
 이 문서는 구현 절차와 위험 지점을 담는다. 모듈 경계와 코드 위치는 [architecture.md](architecture.md),
-검증은 [testing.md](testing.md)를 따른다. 전체 흐름, API 계약, Redis key 목록, 설정값 기본값은
-[README.md](../README.md)가 원본이며 이 문서에서 값을 외워 쓰지 않는다.
+검증은 [testing.md](testing.md)를 따른다. 요청 흐름과 API 계약은 [api.md](api.md), Redis key 목록은
+[architecture.md](architecture.md#redis-key-소유권), 설정 목록은 아래 [설정](#설정)이 원본이다. 설정 기본값은 각 모듈의
+`application.yml`과 설정 클래스가 원본이라 이 문서에 외워 쓰지 않는다.
 
 ## 기술 기준
 
@@ -23,7 +24,7 @@
 
 ## 작업 시작 전
 
-1. 바꿀 경로가 위 셋 중 무엇인지 정하고, 그 경로가 만지는 Redis key를 `README.md`에서 확인한다.
+1. 바꿀 경로가 위 셋 중 무엇인지 정하고, 그 경로가 만지는 Redis key를 [architecture.md](architecture.md#redis-key-소유권)에서 확인한다.
 2. 관련 Lua script 원문을 읽는다. 원자성과 멱등성의 실제 판정은 Java 코드가 아니라 script에 있다.
 3. 그 key를 다른 쪽(API 또는 scheduler)이 함께 읽고 쓰는지 확인한다.
 4. 설정값을 추가·변경한다면 API와 scheduler가 **공유해야 하는 값인지** 한쪽 전용인지 먼저 정한다.
@@ -39,7 +40,7 @@
 4. **application** — use case와 계산을 구현한다. 시각은 주입된 `Clock`을 쓰고 `System.currentTimeMillis()`를
    직접 부르지 않는다. 테스트가 시각을 고정할 수 없게 된다.
 5. **api 또는 scheduler** — 요청 검증과 응답 조립, 또는 주기 실행 트리거만 담당한다.
-6. **설정** — `app.queue` 아래에 두고 환경 변수 이름을 `README.md` 표에 함께 적는다.
+6. **설정** — `app.queue` 아래에 두고 환경 변수 이름을 아래 [설정](#설정) 표에 함께 적는다.
 7. **테스트와 검증** — [testing.md](testing.md)의 기준대로 실행한다.
 
 ## Lua script — 원자성과 멱등성의 최종 판정자
@@ -105,6 +106,31 @@
 - `queue:waiting:performances`는 TTL이 없고 비면 제거되는 scan 대상 set이다. 이 성질을 바꾸면
   scheduler가 회차를 영구히 순회하거나 놓친다.
 - 운영 Redis에서 전체 key를 훑는 명령을 쓰지 않는다.
+
+## 설정
+
+회차별 처리량 정책은 Redis에 저장하지 않는다. 입장량은 scheduler 공통 `advanceBatchSize`, TTL은 애플리케이션 공통값으로
+관리한다. "둘 다"인 값은 API와 scheduler에 **같은 값**을 넣는다. 다르면 두 프로세스가 shard·slot을 다르게 계산한다.
+
+| 환경 변수 | property | 쓰는 곳 | 뜻 |
+| --- | --- | --- | --- |
+| `QUEUE_TOKEN_SECRET` | `app.queue.queue-token-secret` | API | queueToken 서명 secret. 32바이트 이상, 기본값 없음 |
+| `ADMISSION_TOKEN_SECRET_KEY` | `security.admission.secret-key` | API | admission token 서명 secret. Core와 같은 값, 32바이트 이상, 기본값 없음 |
+| `JWT_SECRET` | `security.jwt.secret-key` | API | Core access token 검증 secret. Core와 같은 값, 기본값 없음 |
+| `JWT_ISSUER` | `security.jwt.issuer` | API | Core access token issuer |
+| `QUEUE_DEFAULT_QUEUE_TTL` | `app.queue.default-queue-ttl` | 둘 다 | queue token·번호표·state의 수명 |
+| `QUEUE_DEFAULT_REFRESH_AFTER_MS` | `app.queue.default-refresh-after-ms` | 둘 다 | 클라이언트 state 재조회 권장 간격 |
+| `QUEUE_SHARD_COUNT` | `app.queue.shard-count` | 둘 다 | 회차별 queue shard 수 |
+| `QUEUE_SLOT_SIZE_MILLIS` | `app.queue.slot-size-millis` | 둘 다 | 공정성 time slot 크기 |
+| `QUEUE_SLOT_CLOSE_GRACE_MILLIS` | `app.queue.slot-close-grace-millis` | scheduler | slot을 확정하기 전 기다리는 시간 |
+| `QUEUE_ADVANCE_BATCH_SIZE` | `app.queue.advance-batch-size` | scheduler | 회차 하나를 한 번에 전진시킬 최대 인원 |
+| `QUEUE_ADVANCE_INTERVAL_MS` | `app.queue.advance-interval-ms` | scheduler | scheduler 실행 간격 |
+| `SPRING_DATA_REDIS_HOST`, `SPRING_DATA_REDIS_PORT` | `spring.data.redis.*` | 둘 다 | Redis 주소. 지정하지 않으면 `localhost:6379` |
+| 없음 | `app.queue.shopping-session-ttl` | API | admission token과 입장 멱등 marker의 수명 |
+| 없음 | `app.queue.join-poll-after-ms` | API | join 응답 후 state 재조회 권장 간격 |
+| 없음 | `app.queue.redirect.ticketing-url-template` | API | 입장 후 redirect URL |
+
+운영 값은 EC2의 `.env`에 있다. 변수 목록 예시는 [deploy/env.example](../deploy/env.example)이다.
 
 ## 완료로 판정하지 않는 조건
 
