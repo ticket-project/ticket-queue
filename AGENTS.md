@@ -19,14 +19,15 @@ Codex와 Copilot은 이 파일을 직접 읽고, Claude Code는 루트 `CLAUDE.m
 
 | 작업 성격 | 먼저 읽을 문서 |
 | --- | --- |
-| 모듈 경계, 코드 위치, 의존 방향, Redis key 소유권 | `docs/architecture.md` |
-| join·state·enter 구현, Lua, scheduler 전진, TTL, secret | `docs/development.md` |
+| 요청 흐름, endpoint, 응답 형식 | `docs/api.md` |
+| 모듈 경계, 코드 위치, 의존 방향, Redis key 목록과 소유권 | `docs/architecture.md` |
+| join·state·enter 구현, Lua, scheduler 전진, TTL, secret, 설정 목록 | `docs/development.md` |
 | 무엇을 검증할지 고르기, 새 테스트 추가 | `docs/testing.md` |
 | `/state` 캐시 설정 | `docs/cloudflare-state-api-cache.md` |
 | 커밋·브랜치·PR | `docs/development.md` 의 커밋과 PR 절차·컨벤션 |
 | 배포 구성과 EC2 설정 | `deploy/README.md` |
 
-전체 흐름과 API 계약, Redis key 목록, 설정값 기본값은 `README.md`가 원본이다. 실제 모듈 경계는
+`README.md`는 사람용 진입점이라 규칙의 원본이 아니다. 설정 기본값은 각 모듈 `application.yml`이 원본이다. 실제 모듈 경계는
 `settings.gradle`과 각 모듈 `build.gradle`, 강제되는 규칙은 root `src/test`의 테스트가 최종 기준이다.
 
 소스는 단일 모듈이 아니다. `queue-api/src`, `queue-scheduler/src`, `queue-redis/src`에 나뉘어 있고
@@ -101,14 +102,11 @@ git diff --check
 
 ## 커밋 및 PR
 
-- 커밋 메시지와 PR 제목은 Conventional Commits 기반 `<type>(<scope>): <한국어 설명>` 형식을 따른다.
-- `scope`는 선택 사항이며 기존 도메인 또는 모듈 이름을 우선 사용한다.
-- 허용 `type`은 `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `build`, `ci`, `security`, `revert`다.
-- 설명은 한국어로 작성하고 마침표를 붙이지 않는다. 기술 고유명사는 원문 표기를 허용한다.
+- 커밋 메시지와 PR 제목은 `<type>(<scope>): <한국어 설명>` 형식을 따른다. type·scope 목록과 본문 규칙은
+  [커밋과 PR 컨벤션](docs/development.md#커밋과-pr-컨벤션)이 원본이다.
 - 하나의 커밋에는 하나의 목적만 포함하며 기존 사용자 변경과 섞지 않는다.
 - 작업은 작업 브랜치에서 하고 `master`에 직접 커밋하거나 push하지 않는다. `master` push는 곧 운영 배포다.
 - PR 반영은 `gh pr merge --squash` 또는 `--rebase`를 쓴다. 선형 이력을 유지하므로 merge commit을 만들지 않는다.
 - 커밋 전 변경 범위에 맞는 검증을 실행하고 결과를 확인한다.
 - 이미 원격에 올라간 커밋 이력을 변경하려면 먼저 사용자 승인을 받는다.
-- 절차 전체는 [커밋과 PR 절차](docs/development.md#커밋과-pr-절차), 메시지 규칙 상세는
-  [커밋과 PR 컨벤션](docs/development.md#커밋과-pr-컨벤션)을 따른다.
+- 절차 전체는 [커밋과 PR 절차](docs/development.md#커밋과-pr-절차)를 따른다.

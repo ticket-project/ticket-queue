@@ -13,7 +13,9 @@ review, Copilot coding agent는 모두 그 기준을 따른다. **이 파일에 
 | 모듈 경계와 강제되는 규칙 | `docs/architecture.md` |
 | 구현 절차, Lua·TTL·secret 규칙, 완료 조건 | `docs/development.md` |
 | 검증 명령과 테스트 관례 | `docs/testing.md` |
-| API 계약, Redis key 목록, 설정값 기본값 | `README.md` |
+| 요청 흐름과 API 계약 | `docs/api.md` |
+| Redis key 목록 | `docs/architecture.md` 의 "Redis key 소유권" |
+| 설정 목록 | `docs/development.md` 의 "설정" |
 | `/state` 캐시 설정 | `docs/cloudflare-state-api-cache.md` |
 
 ## 문서를 열 수 없는 경우에도 적용할 최소 기준
