@@ -68,6 +68,21 @@
   같은 slot 안에서는 shard round-robin으로 전진한다.
 - `capacity = min(advanceBatchSize, pendingInClosedSlots)`다. `advanceBatchSize`는 회차별 운영 정책이 아니라
   scheduler 전체에 적용되는 기술 설정이며 **회차 하나의 1회 실행 한도**다.
+- **적용 중인 `advanceBatchSize`는 실행마다 정한다.** Redis `queue:config:advance-batch-size`에 0 이상의 정수가 있으면
+  그 값을, 없으면 `QUEUE_ADVANCE_BATCH_SIZE`를 쓴다. 0이면 아무도 전진시키지 않고 public state만 갱신한다.
+  값이 정수가 아니거나 음수면 무시하고 직전 값을 유지한다. Redis 읽기에 실패해도 직전 값을 유지한다.
+  기본값으로 돌아가면 운영자가 0으로 멈춰 둔 입장이 풀리기 때문이다. 값이 바뀌면 scheduler가
+  `advance batch size changed` INFO 로그를 남긴다. 운영 절차는 [deploy/README.md](../deploy/README.md#운영-중-입장-한도-바꾸기)다.
+- scheduler는 전진 상태를 Micrometer 지표로 내보내고 Datadog이 `/actuator/prometheus`에서 수집한다.
+
+  | 지표(Prometheus 이름) | 뜻 |
+  | --- | --- |
+  | `queue_scheduler_advance_batch_size` | 이번 실행에서 회차 하나에 적용한 한도 |
+  | `queue_scheduler_advance_batch_size_override` | Redis override 적용 중이면 1, 환경 변수 기본값이면 0 |
+  | `queue_scheduler_waiting_performances` | 이번 실행에서 전진시킨 대기 중 회차 수. 한도 × 이 값이 Core로 갈 수 있는 최대 인원이다 |
+  | `queue_scheduler_admitted_total` | 입장 허용으로 전진시킨 사용자 수 누적. 초당 증가량이 실제 입장 허용 속도다 |
+  | `queue_scheduler_advance_batch_size_override_rejected_total` | 잘못된 override를 읽은 실행 수 |
+  | `queue_scheduler_advance_batch_size_override_read_failures_total` | override 읽기에 실패한 실행 수 |
 - **`advanceBatchSize`와 `advanceIntervalMs`는 함께 실제 유입량을 결정한다.** 하나만 바꾸고 검증했다고
   판단하지 않는다. 두 값의 조합으로 초당 입장량을 계산해 보고한다.
 - batch 한도는 **대기 중인 회차마다 각각** 적용된다. 동시에 여러 회차가 열리면 Core로 가는 합계는 더 커진다.
@@ -110,7 +125,9 @@
 ## 설정
 
 회차별 처리량 정책은 Redis에 저장하지 않는다. 입장량은 scheduler 공통 `advanceBatchSize`, TTL은 애플리케이션 공통값으로
-관리한다. "둘 다"인 값은 API와 scheduler에 **같은 값**을 넣는다. 다르면 두 프로세스가 shard·slot을 다르게 계산한다.
+관리한다. 다만 `advanceBatchSize`는 운영 중에 Redis의 공통 값 하나(`queue:config:advance-batch-size`)로 덮어쓸 수 있다.
+회차별 값이 아니라 모든 회차에 같은 값이 적용된다([scheduler 전진 규칙](#scheduler-전진-규칙)).
+"둘 다"인 값은 API와 scheduler에 **같은 값**을 넣는다. 다르면 두 프로세스가 shard·slot을 다르게 계산한다.
 
 | 환경 변수 | property | 쓰는 곳 | 뜻 |
 | --- | --- | --- | --- |
@@ -123,7 +140,7 @@
 | `QUEUE_SHARD_COUNT` | `app.queue.shard-count` | 둘 다 | 회차별 queue shard 수 |
 | `QUEUE_SLOT_SIZE_MILLIS` | `app.queue.slot-size-millis` | 둘 다 | 공정성 time slot 크기 |
 | `QUEUE_SLOT_CLOSE_GRACE_MILLIS` | `app.queue.slot-close-grace-millis` | scheduler | slot을 확정하기 전 기다리는 시간 |
-| `QUEUE_ADVANCE_BATCH_SIZE` | `app.queue.advance-batch-size` | scheduler | 회차 하나를 한 번에 전진시킬 최대 인원 |
+| `QUEUE_ADVANCE_BATCH_SIZE` | `app.queue.advance-batch-size` | scheduler | 회차 하나를 한 번에 전진시킬 최대 인원의 기본값. Redis override가 없을 때 쓴다 |
 | `QUEUE_ADVANCE_INTERVAL_MS` | `app.queue.advance-interval-ms` | scheduler | scheduler 실행 간격 |
 | `SPRING_DATA_REDIS_HOST`, `SPRING_DATA_REDIS_PORT` | `spring.data.redis.*` | 둘 다 | Redis 주소. 지정하지 않으면 `localhost:6379` |
 | 없음 | `app.queue.shopping-session-ttl` | API | admission token과 입장 멱등 marker의 수명 |

@@ -57,7 +57,7 @@ Queue Server는 Ticket Server의 좌석 선택, hold, 주문, refresh token Redi
 - scheduler의 shard별 serving sequence 전진과 `enter`의 admission token 발급은 별도 단계이므로 순서 검증과 멱등성을 함께 검증한다.
 - queue ticket TTL(`defaultQueueTtl`)과 예매 가능 session TTL(`shoppingSessionTtl`)은 목적이 다르다.
 - admission token secret, issuer, audience는 Ticket Server 설정과 일치해야 한다.
-- `advanceBatchSize`는 scheduler의 회차별 1회 실행 한도다. `advanceIntervalMs`와 함께 실제 유입량을 결정하므로 둘을 함께 검증한다.
+- `advanceBatchSize`는 scheduler의 회차별 1회 실행 한도다. 운영 중에는 Redis `queue:config:advance-batch-size`가 이 값을 덮어쓴다(`docs/development.md`의 scheduler 전진 규칙). `advanceIntervalMs`와 함께 실제 유입량을 결정하므로 둘을 함께 검증한다.
 - Queue Server의 `state`는 공개 API라 access token/header를 요구하지 않고, `enter`는 `X-Queue-Token`만 검증한다.
 - `/state` polling은 Cloudflare/nginx 캐시 경유를 전제로 하며, `join`/`enter`는 캐시하지 않는다.
 - `enter` 성공 응답을 받은 뒤 클라이언트는 admission token을 들고 Ticket Server 예매 흐름으로 이동한다.

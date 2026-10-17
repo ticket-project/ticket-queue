@@ -10,6 +10,10 @@ public final class RedisKey {
         return "queue:waiting:performances";
     }
 
+    public static String advanceBatchSizeOverride() {
+        return "queue:config:advance-batch-size";
+    }
+
     public static String shardSequence(final Long performanceId, final int shardId) {
         return "q:" + shardHashTag(performanceId, shardId) + ":seq";
     }

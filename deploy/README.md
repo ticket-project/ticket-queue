@@ -146,6 +146,29 @@ X-Content-Type-Options: nosniff
 
 AWS security group은 `22`, `80`, `443`만 엽니다. Redis `6379`, API `8090`, 스케줄러 `8091`은 직접 외부에 노출하지 않습니다.
 
+## 운영 중 입장 한도 바꾸기
+
+scheduler는 실행할 때마다 Redis `queue:config:advance-batch-size`를 읽습니다. 값이 있으면 `QUEUE_ADVANCE_BATCH_SIZE` 대신 그 값을 회차당 1회 실행 한도로 씁니다. 재기동 없이 다음 실행부터 반영됩니다. 규칙의 원본은 [development.md의 scheduler 전진 규칙](../docs/development.md#scheduler-전진-규칙)입니다.
+
+```bash
+cd /home/ubuntu/ticket-queue
+# 한도를 70으로 바꾼다. QUEUE_ADVANCE_INTERVAL_MS=1000이면 회차마다 초당 70명이다
+sudo docker compose exec redis redis-cli SET queue:config:advance-batch-size 70
+# 입장을 멈춘다. /state는 계속 갱신된다
+sudo docker compose exec redis redis-cli SET queue:config:advance-batch-size 0
+# 지금 값을 본다. (nil)이면 QUEUE_ADVANCE_BATCH_SIZE를 쓰는 중이다
+sudo docker compose exec redis redis-cli GET queue:config:advance-batch-size
+# QUEUE_ADVANCE_BATCH_SIZE로 되돌린다
+sudo docker compose exec redis redis-cli DEL queue:config:advance-batch-size
+# scheduler가 반영했는지 본다
+sudo docker compose logs --since=2m scheduler | grep "advance batch size"
+```
+
+- 0 이상의 정수만 받습니다. 정수가 아니거나 음수면 scheduler가 무시하고 직전 값을 유지하며 `ignored invalid advance batch size override` WARN을 남깁니다. 값을 바꾼 뒤에는 위 로그에서 `advance batch size changed`를 확인합니다.
+- Datadog에서는 scheduler 지표 `queue_scheduler_advance_batch_size`(적용 한도), `queue_scheduler_advance_batch_size_override`(override 적용 여부), `queue_scheduler_admitted_total`(입장 허용 누적)로 확인합니다. 지표 목록은 [development.md의 scheduler 전진 규칙](../docs/development.md#scheduler-전진-규칙)에 있습니다. Datadog OpenMetrics 수집은 `ticket_queue_scheduler` namespace를 붙이므로, 배포 뒤 실제 이름을 Metrics Explorer에서 확인합니다.
+- 한도는 모든 회차에 같은 값으로 적용됩니다. 여러 회차가 동시에 대기 중이면 Core로 가는 합계는 회차 수만큼 커집니다.
+- Redis는 AOF를 끄고 실행하므로(`--appendonly no`) 재시작 뒤 이 값이 남는다고 보장하지 않습니다. Redis를 다시 띄운 뒤에는 `GET`으로 확인하고, 오래 유지할 값은 `.env`의 `QUEUE_ADVANCE_BATCH_SIZE`에도 반영합니다.
+
 ## ECS 전환 시
 
 현재 모듈과 이미지는 그대로 사용하고 인프라만 다음처럼 바꾸면 됩니다.

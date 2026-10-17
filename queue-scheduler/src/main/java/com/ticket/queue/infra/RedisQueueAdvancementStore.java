@@ -11,11 +11,13 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.redisson.api.RBucket;
 import org.redisson.api.RLock;
 import org.redisson.api.RMap;
 import org.redisson.api.RScript;
@@ -51,7 +53,13 @@ public class RedisQueueAdvancementStore implements QueueAdvancementStore {
     }
 
     @Override
-    public void advancePublicState(
+    public Optional<String> findAdvanceBatchSizeOverride() {
+        RBucket<String> override = redissonClient.getBucket(RedisKey.advanceBatchSizeOverride(), StringCodec.INSTANCE);
+        return Optional.ofNullable(override.get());
+    }
+
+    @Override
+    public int advancePublicState(
             final Long performanceId,
             final int advanceBatchSize,
             final int shardCount,
@@ -62,12 +70,12 @@ public class RedisQueueAdvancementStore implements QueueAdvancementStore {
     ) {
         validatePositive(performanceId, "performanceId");
         if (stateTtl.isZero() || stateTtl.isNegative()) {
-            return;
+            return 0;
         }
 
         RLock lock = redissonClient.getLock(RedisKey.advanceLock(performanceId));
         if (!tryAdvanceLock(lock)) {
-            return;
+            return 0;
         }
         try {
             List<ShardQueueState> states = readShardStates(performanceId, shardCount, stateTtl);
@@ -92,6 +100,7 @@ public class RedisQueueAdvancementStore implements QueueAdvancementStore {
 
             publishPublicState(performanceId, states, shardCount, slotSizeMillis, refreshAfterMs, rrCursor, stateTtl);
             removeWaitingPerformanceIfNoPendingShard(states, performanceId);
+            return advanceBatchSize - remaining;
         } finally {
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
