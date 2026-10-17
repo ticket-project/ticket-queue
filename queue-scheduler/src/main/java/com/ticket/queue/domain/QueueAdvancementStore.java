@@ -1,13 +1,16 @@
 package com.ticket.queue.domain;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.Set;
 
 public interface QueueAdvancementStore {
 
     Set<Long> findWaitingPerformanceIds();
 
-    void advancePublicState(
+    Optional<String> findAdvanceBatchSizeOverride();
+
+    int advancePublicState(
             Long performanceId,
             int advanceBatchSize,
             int shardCount,

@@ -165,14 +165,40 @@ class RedisQueueContractIntegrationTest {
         assertThat(result.status()).isEqualTo(EnterResult.Status.ADMITTED);
     }
 
+    @Test
+    void advance_batch_size_override_is_read_from_shared_config_key() {
+        assertThat(advancementStore.findAdvanceBatchSizeOverride()).isEmpty();
+
+        redissonClient.getBucket(RedisKey.advanceBatchSizeOverride(), StringCodec.INSTANCE).set("70");
+        assertThat(advancementStore.findAdvanceBatchSizeOverride()).contains("70");
+
+        redissonClient.getKeys().delete(RedisKey.advanceBatchSizeOverride());
+        assertThat(advancementStore.findAdvanceBatchSizeOverride()).isEmpty();
+    }
+
+    @Test
+    void zero_batch_size_refreshes_public_state_without_admitting() {
+        admissionStore.joinQueue(6L, "user-a", "queue-a", closedSlot(0), QUEUE_TTL);
+
+        assertThat(advance(6L, 0)).isZero();
+        PublicState stopped = admissionStore.readPublicState(6L, 1_000L);
+        assertThat(stopped.serving()).containsEntry(0, 0L);
+        assertThat(stopped.tail()).containsEntry(0, 1L);
+        assertThat(stopped.status()).isEqualTo("OPEN");
+        assertThat(advancementStore.findWaitingPerformanceIds()).containsExactly(6L);
+
+        assertThat(advance(6L, 1)).isEqualTo(1);
+        assertThat(admissionStore.readPublicState(6L, 1_000L).serving()).containsEntry(0, 1L);
+    }
+
     private QueueShardSlot closedSlot(final int shardId) {
         long slotStartMillis = System.currentTimeMillis() - 1_000L;
         long slotId = Math.floorDiv(slotStartMillis, SLOT_SIZE_MILLIS);
         return new QueueShardSlot(shardId, slotId, slotStartMillis);
     }
 
-    private void advance(final Long performanceId, final int batchSize) {
-        advancementStore.advancePublicState(
+    private int advance(final Long performanceId, final int batchSize) {
+        return advancementStore.advancePublicState(
                 performanceId,
                 batchSize,
                 SHARD_COUNT,

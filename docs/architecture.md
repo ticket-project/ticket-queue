@@ -85,6 +85,7 @@ q:{performanceId:shardId}:waiting-marker        # waiting set 재등록을 줄�
 q:{performanceId}:state                         # public state projection hash; defaultQueueTtl
 q:{performanceId}:entered:{queueId}             # enter 멱등 marker hash; shoppingSessionTtl
 queue:waiting:performances                       # scheduler scan 대상 performanceId set; TTL 없이 비면 제거
+queue:config:advance-batch-size                  # 운영 중 advanceBatchSize override 문자열; TTL 없음, 운영자가 쓰고 scheduler만 읽음
 ```
 
 scheduler는 각 shard의 `q:{performanceId:shardId}:seq`를 읽어 tail을 계산한다. 그래서 `/join`은 state hash를 매번
@@ -96,7 +97,8 @@ scheduler는 각 shard의 `q:{performanceId:shardId}:seq`를 읽어 tail을 계�
   현재 배포는 단일 Redis지만 Redis Cluster를 고려한 형태를 유지한다.
 - **누가 쓰는 key인지 구분한다.** `/join`은 shard-local counter, user marker, compact ticket, slot tail,
   pending slot, waiting marker만 갱신한다. shard state와 public state는 scheduler가 갱신한다.
-  join hot path에서 public projection을 쓰는 코드는 경계 위반이다.
+  join hot path에서 public projection을 쓰는 코드는 경계 위반이다. `queue:config:advance-batch-size`는
+  애플리케이션이 쓰지 않는다. 운영자가 `redis-cli`로 쓰고 지운다.
 
 ## 다른 시스템과의 경계
 
